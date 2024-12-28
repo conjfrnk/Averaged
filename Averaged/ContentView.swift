@@ -20,19 +20,23 @@ struct ContentView: View {
 
                     YearlyView()
                         .tabItem {
-                            Label("Yearly", systemImage: "calendar")
+                            Label(
+                                "Yearly",
+                                systemImage: "chart.line.text.clipboard")
                         }
                         .tag(0)
 
                     MonthlyView()
                         .tabItem {
-                            Label("Monthly", systemImage: "calendar.badge.plus")
+                            Label("Monthly", systemImage: "calendar")
                         }
                         .tag(1)
 
                     WeeklyView()
                         .tabItem {
-                            Label("Weekly", systemImage: "calendar.badge.minus")
+                            Label(
+                                "Weekly",
+                                systemImage: "calendar.badge.exclamationmark")
                         }
                         .tag(2)
                 }
