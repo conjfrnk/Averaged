@@ -11,7 +11,6 @@ import SwiftUI
 struct YearlyView: View {
     @StateObject private var healthDataManager = HealthDataManager()
     @State private var monthlyWakeTimes: [MonthlyWakeData] = []
-    //@State private var monthlyScreenTimes: [MonthlyScreenData] = []
     @State private var goalWakeMinutes: Double = 360
     @State private var goalScreenTimeMinutes: Double = 120
 
@@ -19,7 +18,6 @@ struct YearlyView: View {
         VStack(spacing: 16) {
             Text("Yearly Sleep Data")
                 .font(.headline)
-
             Chart {
                 ForEach(monthlyWakeTimes) { item in
                     LineMark(
@@ -27,20 +25,17 @@ struct YearlyView: View {
                         y: .value("Wake Time", item.wakeMinutes)
                     )
                     .foregroundStyle(.green)
-
                     PointMark(
                         x: .value("Month", item.date),
                         y: .value("Wake Time", item.wakeMinutes)
                     )
                     .foregroundStyle(.green)
                 }
-                RuleMark(
-                    y: .value("Goal Wake", goalWakeMinutes)
-                )
-                .lineStyle(.init(lineWidth: 2, dash: [5]))
-                .foregroundStyle(.green.opacity(0.8))
+                RuleMark(y: .value("Goal Wake", goalWakeMinutes))
+                    .lineStyle(.init(lineWidth: 2, dash: [5]))
+                    .foregroundStyle(.green.opacity(0.8))
             }
-            .chartXScale(domain: domainForYearlyX(monthlyWakeTimes.map(\.date)))
+            .chartXScale(domain: fullYearXDomain())
             .chartXAxis {
                 AxisMarks(values: .stride(by: .month)) { value in
                     AxisGridLine()
@@ -51,6 +46,7 @@ struct YearlyView: View {
                     }
                 }
             }
+            .chartYScale(domain: yearlyYDomain())
             .chartYAxis {
                 AxisMarks(position: .leading) { val in
                     AxisGridLine()
@@ -62,7 +58,6 @@ struct YearlyView: View {
                 }
             }
             .frame(height: 200)
-
             if let avg = computeAverageWakeTime() {
                 let txt = minutesToHHmm(avg)
                 HStack {
@@ -78,76 +73,7 @@ struct YearlyView: View {
             } else {
                 Text("Yearly Avg Wake Time: N/A")
             }
-
-            /*
-            Divider()
-
-            Text("Yearly Screen Time")
-                .font(.headline)
-
-            Chart {
-                ForEach(monthlyScreenTimes) { item in
-                    LineMark(
-                        x: .value("Month", item.date),
-                        y: .value("Screen Time", item.screenMinutes)
-                    )
-                    .foregroundStyle(.blue)
-
-                    PointMark(
-                        x: .value("Month", item.date),
-                        y: .value("Screen Time", item.screenMinutes)
-                    )
-                    .foregroundStyle(.blue)
-                }
-                RuleMark(
-                    y: .value("Goal Screen Time", goalScreenTimeMinutes)
-                )
-                .lineStyle(.init(lineWidth: 2, dash: [5]))
-                .foregroundStyle(.blue.opacity(0.8))
-            }
-            .chartXScale(
-                domain: domainForYearlyX(monthlyScreenTimes.map(\.date))
-            )
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .month)) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let date = value.as(Date.self) {
-                            Text(singleLetterMonth(date))
-                        }
-                    }
-                }
-            }
-            .chartYAxis {
-                AxisMarks(position: .leading) { val in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let rawVal = val.as(Double.self) {
-                            Text(minutesToHHmm(rawVal))
-                        }
-                    }
-                }
-            }
-            .frame(height: 200)
-
-            if let avg = computeAverageScreenTime() {
-                let txt = minutesToHHmm(avg)
-                HStack {
-                    Text("Yearly Avg Screen Time: \(txt)")
-                    if avg <= goalScreenTimeMinutes {
-                        Image(systemName: "arrow.down.circle.fill")
-                            .foregroundColor(.green)
-                    } else {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .foregroundColor(.red)
-                    }
-                }
-            } else {
-                Text("Yearly Avg Screen Time: N/A")
-            }
-
             Spacer()
-             */
         }
         .padding()
         .onAppear {
@@ -158,40 +84,34 @@ struct YearlyView: View {
 
     private func loadMonthlyData() {
         healthDataManager.fetchAverageWakeTimes(byMonth: true) { dict in
-            let sorted = dict.sorted { $0.key < $1.key }
-            let mapped = sorted.map { (date, minutes) in
-                MonthlyWakeData(date: date, wakeMinutes: minutes)
+            let now = Date()
+            let calendar = Calendar.current
+            var temp: [MonthlyWakeData] = []
+            for i in (0..<12).reversed() {
+                guard
+                    let someDate = calendar.date(
+                        byAdding: .month, value: -i, to: now)
+                else { continue }
+                let comps = calendar.dateComponents(
+                    [.year, .month], from: someDate)
+                guard let startOfMonth = calendar.date(from: comps) else {
+                    continue
+                }
+                let monthlyAverage = dict[startOfMonth] ?? 0
+                temp.append(
+                    MonthlyWakeData(
+                        date: startOfMonth, wakeMinutes: monthlyAverage))
             }
-            monthlyWakeTimes = mapped
+            monthlyWakeTimes = temp
         }
-        /*
-        healthDataManager.fetchAverageScreenTime(byMonth: true) { dict in
-            let sorted = dict.sorted { $0.key < $1.key }
-            let mapped = sorted.map { (date, minutes) in
-                MonthlyScreenData(date: date, screenMinutes: minutes)
-            }
-            monthlyScreenTimes = mapped
-        }
-         */
     }
 
     private func computeAverageWakeTime() -> Double? {
         guard !monthlyWakeTimes.isEmpty else { return nil }
         let sum = monthlyWakeTimes.reduce(0.0) { $0 + $1.wakeMinutes }
         let avg = sum / Double(monthlyWakeTimes.count)
-        if avg.isNaN || avg.isInfinite { return nil }
-        return avg
+        return avg.isNaN || avg.isInfinite ? nil : avg
     }
-
-    /*
-    private func computeAverageScreenTime() -> Double? {
-        guard !monthlyScreenTimes.isEmpty else { return nil }
-        let sum = monthlyScreenTimes.reduce(0.0) { $0 + $1.screenMinutes }
-        let avg = sum / Double(monthlyScreenTimes.count)
-        if avg.isNaN || avg.isInfinite { return nil }
-        return avg
-    }
-     */
 
     private func minutesToHHmm(_ val: Double) -> String {
         if val.isNaN || val.isInfinite { return "N/A" }
@@ -219,12 +139,48 @@ struct YearlyView: View {
         }
     }
 
-    private func domainForYearlyX(_ dates: [Date]) -> ClosedRange<Date> {
-        guard let minDate = dates.min(), let maxDate = dates.max() else {
-            let now = Date()
+    private func fullYearXDomain() -> ClosedRange<Date> {
+        let calendar = Calendar.current
+        let now = Date()
+        guard
+            let earliest = calendar.date(
+                byAdding: .month, value: -11, to: startOfThisMonth())
+        else {
             return now...now
         }
-        return minDate...maxDate
+        return earliest...endOfThisMonth()
+    }
+
+    private func startOfThisMonth() -> Date {
+        let calendar = Calendar.current
+        let comps = calendar.dateComponents([.year, .month], from: Date())
+        return calendar.date(from: comps) ?? Date()
+    }
+
+    private func endOfThisMonth() -> Date {
+        let calendar = Calendar.current
+        let start = startOfThisMonth()
+        guard let dayRange = calendar.range(of: .day, in: .month, for: start)
+        else {
+            return start
+        }
+        let lastDay = dayRange.upperBound - 1
+        return calendar.date(bySetting: .day, value: lastDay, of: start)
+            ?? start
+    }
+
+    private func yearlyYDomain() -> ClosedRange<Double> {
+        let rawVals = monthlyWakeTimes.map { $0.wakeMinutes }.filter {
+            !$0.isNaN && !$0.isInfinite
+        }
+        guard !rawVals.isEmpty else { return 0...0 }
+        let minVal = rawVals.min()!
+        let maxVal = rawVals.max()!
+        let minFloor = Double(Int(minVal / 30) * 30) - 30
+        let maxCeil = Double(Int(maxVal / 30) * 30) + 30
+        let lower = max(0, minFloor)
+        let upper = min(Double(24 * 60), maxCeil)
+        return lower...upper
     }
 }
 
@@ -233,11 +189,3 @@ struct MonthlyWakeData: Identifiable {
     let date: Date
     let wakeMinutes: Double
 }
-
-/*
- struct MonthlyScreenData: Identifiable {
- let id = UUID()
- let date: Date
- let screenMinutes: Double
- }
- */
