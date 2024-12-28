@@ -11,7 +11,7 @@ import SwiftUI
 struct YearlyView: View {
     @StateObject private var healthDataManager = HealthDataManager()
     @State private var monthlyWakeTimes: [MonthlyWakeData] = []
-    @State private var monthlyScreenTimes: [MonthlyScreenData] = []
+    //@State private var monthlyScreenTimes: [MonthlyScreenData] = []
     @State private var goalWakeMinutes: Double = 360
     @State private var goalScreenTimeMinutes: Double = 120
 
@@ -79,6 +79,7 @@ struct YearlyView: View {
                 Text("Yearly Avg Wake Time: N/A")
             }
 
+            /*
             Divider()
 
             Text("Yearly Screen Time")
@@ -146,6 +147,7 @@ struct YearlyView: View {
             }
 
             Spacer()
+             */
         }
         .padding()
         .onAppear {
@@ -162,6 +164,7 @@ struct YearlyView: View {
             }
             monthlyWakeTimes = mapped
         }
+        /*
         healthDataManager.fetchAverageScreenTime(byMonth: true) { dict in
             let sorted = dict.sorted { $0.key < $1.key }
             let mapped = sorted.map { (date, minutes) in
@@ -169,6 +172,7 @@ struct YearlyView: View {
             }
             monthlyScreenTimes = mapped
         }
+         */
     }
 
     private func computeAverageWakeTime() -> Double? {
@@ -179,6 +183,7 @@ struct YearlyView: View {
         return avg
     }
 
+    /*
     private func computeAverageScreenTime() -> Double? {
         guard !monthlyScreenTimes.isEmpty else { return nil }
         let sum = monthlyScreenTimes.reduce(0.0) { $0 + $1.screenMinutes }
@@ -186,6 +191,7 @@ struct YearlyView: View {
         if avg.isNaN || avg.isInfinite { return nil }
         return avg
     }
+     */
 
     private func minutesToHHmm(_ val: Double) -> String {
         if val.isNaN || val.isInfinite { return "N/A" }
@@ -228,8 +234,10 @@ struct MonthlyWakeData: Identifiable {
     let wakeMinutes: Double
 }
 
-struct MonthlyScreenData: Identifiable {
-    let id = UUID()
-    let date: Date
-    let screenMinutes: Double
-}
+/*
+ struct MonthlyScreenData: Identifiable {
+ let id = UUID()
+ let date: Date
+ let screenMinutes: Double
+ }
+ */

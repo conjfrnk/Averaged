@@ -12,17 +12,19 @@ struct MonthlyView: View {
     @StateObject private var healthDataManager = HealthDataManager()
 
     @State private var dailyWakeTimes: [DailyWakeData] = []
-    @State private var dailyScreenTimes: [DailyScreenData] = []
+    //@State private var dailyScreenTimes: [DailyScreenData] = []
 
     @State private var goalWakeMinutes: Double =
         UserDefaults.standard.double(forKey: "goalWakeTimeInMinutes") == 0
         ? 360
         : UserDefaults.standard.double(forKey: "goalWakeTimeInMinutes")
 
+    /*
     @State private var goalScreenTimeMinutes: Double =
         Double(UserDefaults.standard.integer(forKey: "screenTimeGoal")) == 0
         ? 120
         : Double(UserDefaults.standard.integer(forKey: "screenTimeGoal"))
+     */
 
     var body: some View {
         ScrollView {
@@ -109,6 +111,7 @@ struct MonthlyView: View {
                     Text("Monthly Avg Wake: N/A")
                 }
 
+                /*
                 Divider()
 
                 Text("Monthly Screen Time")
@@ -196,6 +199,7 @@ struct MonthlyView: View {
                 }
 
                 Spacer()
+                 */
             }
             .padding()
         }
@@ -216,6 +220,7 @@ struct MonthlyView: View {
             dailyWakeTimes = mapped
         }
 
+        /*
         healthDataManager.fetchAverageScreenTime(byMonth: false) { dict in
             let filtered = dict.filter { $0.key >= startOfCurrentMonth() }
             let sorted = filtered.sorted { $0.key < $1.key }
@@ -224,6 +229,7 @@ struct MonthlyView: View {
             }
             dailyScreenTimes = mapped
         }
+         */
     }
 
     private func monthlyXDomain() -> ClosedRange<Date> {
@@ -287,8 +293,10 @@ struct DailyWakeData: Identifiable {
     let wakeMinutes: Double
 }
 
+/*
 struct DailyScreenData: Identifiable {
     let id = UUID()
     let date: Date
     let screenMinutes: Double
 }
+*/

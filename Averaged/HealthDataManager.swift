@@ -115,6 +115,7 @@ class HealthDataManager: ObservableObject {
         return times
     }
 
+    /*
     func fetchAverageScreenTime(
         byMonth: Bool, completion: @escaping ([Date: Double]) -> Void
     ) {
@@ -147,4 +148,5 @@ class HealthDataManager: ObservableObject {
             completion(result)
         }
     }
+     */
 }
