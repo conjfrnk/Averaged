@@ -31,14 +31,6 @@ struct ContentView: View {
                             Label("Monthly", systemImage: "calendar")
                         }
                         .tag(1)
-
-                    WeeklyView()
-                        .tabItem {
-                            Label(
-                                "Weekly",
-                                systemImage: "calendar.badge.exclamationmark")
-                        }
-                        .tag(2)
                 }
             }
             .navigationTitle("Averaged")
