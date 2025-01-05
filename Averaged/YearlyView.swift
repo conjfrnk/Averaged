@@ -12,31 +12,36 @@ struct YearlyView: View {
     @StateObject private var healthDataManager = HealthDataManager()
     @State private var monthlyWakeTimes: [MonthlyWakeData] = []
     @State private var goalWakeMinutes: Double = 360
-    @State private var goalScreenTimeMinutes: Double = 120
 
     var body: some View {
         VStack(spacing: 16) {
             Text("Yearly Sleep Data")
                 .font(.headline)
+
             Chart {
+                // Plot actual data for any month that has it
                 ForEach(monthlyWakeTimes) { item in
                     LineMark(
                         x: .value("Month", item.date),
                         y: .value("Wake Time", item.wakeMinutes)
                     )
                     .foregroundStyle(.green)
+
                     PointMark(
                         x: .value("Month", item.date),
                         y: .value("Wake Time", item.wakeMinutes)
                     )
                     .foregroundStyle(.green)
                 }
+
+                // Green dashed line for goal
                 RuleMark(y: .value("Goal Wake", goalWakeMinutes))
                     .lineStyle(.init(lineWidth: 2, dash: [5]))
                     .foregroundStyle(.green.opacity(0.8))
             }
-            .chartXScale(domain: fullYearXDomain())
+            .chartXScale(domain: currentYearDomain())
             .chartXAxis {
+                // We’ll have a tick for each month from Jan to Dec
                 AxisMarks(values: .stride(by: .month)) { value in
                     AxisGridLine()
                     AxisValueLabel {
@@ -58,6 +63,7 @@ struct YearlyView: View {
                 }
             }
             .frame(height: 200)
+
             if let avg = computeAverageWakeTime() {
                 let txt = minutesToHHmm(avg)
                 HStack {
@@ -73,41 +79,82 @@ struct YearlyView: View {
             } else {
                 Text("Yearly Avg Wake Time: N/A")
             }
+
             Spacer()
         }
         .padding()
         .onAppear {
-            healthDataManager.requestAuthorization()
-            loadMonthlyData()
+            healthDataManager.requestAuthorization { _, _ in
+                loadMonthlyData()
+            }
+            // If you want the user’s goal from Settings
+            let epoch = UserDefaults.standard.double(forKey: "goalWakeTime")
+            if epoch > 0 {
+                let date = Date(timeIntervalSince1970: epoch)
+                let comps = Calendar.current.dateComponents([.hour, .minute], from: date)
+                goalWakeMinutes = Double((comps.hour ?? 6) * 60 + (comps.minute ?? 0))
+            }
         }
     }
 
     private func loadMonthlyData() {
-        healthDataManager.fetchAverageWakeTimes(byMonth: true) { dict in
-            let now = Date()
+        // We'll fetch a full year’s worth of nights
+        healthDataManager.fetchNightsOverLastNDays(365, sleepGoalMinutes: 480) { nights in
             let calendar = Calendar.current
+            let now = Date()
+            let year = calendar.component(.year, from: now)
+
+            // We'll group only nights that fall in the CURRENT year
+            let january1 = calendar.date(from: DateComponents(year: year, month: 1, day: 1))!
+            let december31 = calendar.date(from: DateComponents(year: year, month: 12, day: 31))!
+
+            let nightsInCurrentYear = nights.filter {
+                $0.sleepEndTime >= january1 && $0.sleepEndTime <= december31
+            }
+
+            // Group by (month) → [wakeMinutes]
+            var grouped: [Date: [Double]] = [:]
+
+            for night in nightsInCurrentYear {
+                // This night’s month
+                let comps = calendar.dateComponents([.year, .month], from: night.sleepEndTime)
+                guard let startOfMonth = calendar.date(from: comps) else { continue }
+
+                // Convert final wake time → minutes from midnight
+                let hour = calendar.component(.hour, from: night.sleepEndTime)
+                let min  = calendar.component(.minute, from: night.sleepEndTime)
+                let wakeMins = Double(hour * 60 + min)
+
+                grouped[startOfMonth, default: []].append(wakeMins)
+            }
+
+            // For each month from 1...12 in the current year,
+            // only add to monthlyWakeTimes if data is present
             var temp: [MonthlyWakeData] = []
-            for i in (0..<12).reversed() {
-                guard
-                    let someDate = calendar.date(
-                        byAdding: .month, value: -i, to: now)
-                else { continue }
-                let comps = calendar.dateComponents(
-                    [.year, .month], from: someDate)
-                guard let startOfMonth = calendar.date(from: comps) else {
+            for month in 1...12 {
+                guard let thisMonthDate = calendar.date(
+                    from: DateComponents(year: year, month: month, day: 1)
+                ) else {
                     continue
                 }
-                let monthlyAverage = dict[startOfMonth] ?? 0
-                temp.append(
-                    MonthlyWakeData(
-                        date: startOfMonth, wakeMinutes: monthlyAverage))
+                // If there's no data for this month, skip it
+                guard let arr = grouped[thisMonthDate], !arr.isEmpty else {
+                    continue
+                }
+                let avg = arr.reduce(0, +) / Double(arr.count)
+                temp.append(MonthlyWakeData(date: thisMonthDate, wakeMinutes: avg))
             }
-            monthlyWakeTimes = temp
+
+            // Sort by chronological
+            monthlyWakeTimes = temp.sorted { $0.date < $1.date }
         }
     }
 
     private func computeAverageWakeTime() -> Double? {
+        // Only average the months that have real data
         guard !monthlyWakeTimes.isEmpty else { return nil }
+
+        // If monthlyWakeTimes has e.g. 3 months, we average their `wakeMinutes`
         let sum = monthlyWakeTimes.reduce(0.0) { $0 + $1.wakeMinutes }
         let avg = sum / Double(monthlyWakeTimes.count)
         return avg.isNaN || avg.isInfinite ? nil : avg
@@ -123,15 +170,15 @@ struct YearlyView: View {
     private func singleLetterMonth(_ date: Date) -> String {
         let month = Calendar.current.component(.month, from: date)
         switch month {
-        case 1: return "J"
-        case 2: return "F"
-        case 3: return "M"
-        case 4: return "A"
-        case 5: return "M"
-        case 6: return "J"
-        case 7: return "J"
-        case 8: return "A"
-        case 9: return "S"
+        case 1:  return "J"
+        case 2:  return "F"
+        case 3:  return "M"
+        case 4:  return "A"
+        case 5:  return "M"
+        case 6:  return "J"
+        case 7:  return "J"
+        case 8:  return "A"
+        case 9:  return "S"
         case 10: return "O"
         case 11: return "N"
         case 12: return "D"
@@ -139,47 +186,32 @@ struct YearlyView: View {
         }
     }
 
-    private func fullYearXDomain() -> ClosedRange<Date> {
+    private func currentYearDomain() -> ClosedRange<Date> {
+        // Jan 1 ... Dec 31 of current year
         let calendar = Calendar.current
-        let now = Date()
-        guard
-            let earliest = calendar.date(
-                byAdding: .month, value: -11, to: startOfThisMonth())
-        else {
-            return now...now
-        }
-        return earliest...endOfThisMonth()
-    }
+        let year = calendar.component(.year, from: Date())
 
-    private func startOfThisMonth() -> Date {
-        let calendar = Calendar.current
-        let comps = calendar.dateComponents([.year, .month], from: Date())
-        return calendar.date(from: comps) ?? Date()
-    }
+        let january1 = calendar.date(from: DateComponents(year: year, month: 1, day: 1))!
+        let december31 = calendar.date(from: DateComponents(year: year, month: 12, day: 31))!
 
-    private func endOfThisMonth() -> Date {
-        let calendar = Calendar.current
-        let start = startOfThisMonth()
-        guard let dayRange = calendar.range(of: .day, in: .month, for: start)
-        else {
-            return start
-        }
-        let lastDay = dayRange.upperBound - 1
-        return calendar.date(bySetting: .day, value: lastDay, of: start)
-            ?? start
+        return january1...december31
     }
 
     private func yearlyYDomain() -> ClosedRange<Double> {
-        let rawVals = monthlyWakeTimes.map { $0.wakeMinutes }.filter {
-            !$0.isNaN && !$0.isInfinite
-        }
-        guard !rawVals.isEmpty else { return 0...0 }
-        let minVal = rawVals.min()!
-        let maxVal = rawVals.max()!
+        // Among the months we do have, find min & max
+        // Also ensure the goalWakeMinutes is included
+        let rawVals = monthlyWakeTimes.map { $0.wakeMinutes }
+        let allVals = rawVals + [goalWakeMinutes]
+
+        guard !allVals.isEmpty else { return 0...0 }
+
+        let minVal = allVals.min()!
+        let maxVal = allVals.max()!
         let minFloor = Double(Int(minVal / 30) * 30) - 30
-        let maxCeil = Double(Int(maxVal / 30) * 30) + 30
-        let lower = max(0, minFloor)
-        let upper = min(Double(24 * 60), maxCeil)
+        let maxCeil  = Double(Int(maxVal / 30) * 30) + 30
+
+        let lower    = max(0, minFloor)
+        let upper    = min(Double(24 * 60), maxCeil)
         return lower...upper
     }
 }

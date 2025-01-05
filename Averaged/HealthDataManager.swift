@@ -7,146 +7,528 @@
 
 import Foundation
 import HealthKit
+import SwiftUI
 
-class HealthDataManager: ObservableObject {
+public class HealthDataManager: ObservableObject {
     private let healthStore = HKHealthStore()
 
-    func requestAuthorization() {
-        guard HKHealthStore.isHealthDataAvailable() else { return }
-        guard
-            let sleepType = HKObjectType.categoryType(
-                forIdentifier: .sleepAnalysis)
-        else { return }
-        let typesToRead: Set<HKObjectType> = [sleepType]
-        healthStore.requestAuthorization(toShare: [], read: typesToRead) {
-            success, error in
+    private let sleepType = HKObjectType.categoryType(
+        forIdentifier: .sleepAnalysis)!
+    private let hrvType = HKObjectType.quantityType(
+        forIdentifier: .heartRateVariabilitySDNN)!
+    private let hrType = HKObjectType.quantityType(forIdentifier: .heartRate)!
+    private let stepsType = HKObjectType.quantityType(
+        forIdentifier: .stepCount)!
+
+    public struct NightData: Identifiable, Hashable {
+        public var id: Date { date }
+
+        public let date: Date
+        public var sleepScore: Int
+        public let hrv: Double
+        public let restingHeartRate: Double
+        public let sleepDuration: TimeInterval
+        public let sleepStartTime: Date
+        public let sleepEndTime: Date
+        public let totalAwakeTime: TimeInterval
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(date)
+        }
+
+        public static func == (lhs: NightData, rhs: NightData) -> Bool {
+            lhs.date == rhs.date
+        }
+
+        public init(
+            date: Date,
+            sleepScore: Int,
+            hrv: Double,
+            restingHeartRate: Double,
+            sleepDuration: TimeInterval,
+            sleepStartTime: Date,
+            sleepEndTime: Date,
+            totalAwakeTime: TimeInterval
+        ) {
+            self.date = date
+            self.sleepScore = sleepScore
+            self.hrv = hrv
+            self.restingHeartRate = restingHeartRate
+            self.sleepDuration = sleepDuration
+            self.sleepStartTime = sleepStartTime
+            self.sleepEndTime = sleepEndTime
+            self.totalAwakeTime = totalAwakeTime
         }
     }
 
-    func fetchAverageWakeTimes(
-        byMonth: Bool, completion: @escaping ([Date: Double]) -> Void
+    public func requestAuthorization(
+        completion: @escaping (Bool, Error?) -> Void
     ) {
-        guard
-            let sleepType = HKObjectType.categoryType(
-                forIdentifier: .sleepAnalysis)
-        else {
-            DispatchQueue.main.async { completion([:]) }
+        let toRead: Set<HKObjectType> = [
+            sleepType, hrvType, hrType, stepsType,
+        ]
+        healthStore.requestAuthorization(toShare: nil, read: toRead) {
+            success, error in
+            DispatchQueue.main.async {
+                completion(success, error)
+            }
+        }
+    }
+
+    /// Fetches night‑by‑night data for the last `days` calendar days.
+    /// Calls `completion` with an array of `NightData`.
+    public func fetchNightsOverLastNDays(
+        _ days: Int,
+        sleepGoalMinutes: Int,
+        completion: @escaping ([NightData]) -> Void
+    ) {
+        guard days > 0 else {
+            DispatchQueue.main.async { completion([]) }
             return
         }
+
+        let group = DispatchGroup()
+        var allNights: [NightData] = []
         let calendar = Calendar.current
         let now = Date()
-        var startDate: Date
-        if byMonth {
-            startDate =
-                calendar.date(byAdding: .month, value: -12, to: now) ?? now
-        } else {
-            startDate =
-                calendar.date(byAdding: .day, value: -30, to: now) ?? now
-        }
-        let predicate = HKQuery.predicateForSamples(
-            withStart: startDate, end: now, options: .strictStartDate)
-        let query = HKSampleQuery(
-            sampleType: sleepType, predicate: predicate,
-            limit: HKObjectQueryNoLimit, sortDescriptors: nil
-        ) { [weak self] _, samples, _ in
-            guard let self = self, let samples = samples as? [HKCategorySample]
+
+        for i in 0..<days {
+            group.enter()
+            guard
+                let dayStart = calendar.date(
+                    byAdding: .day, value: -i, to: now),
+                let nextDay = calendar.date(
+                    byAdding: .day, value: 1, to: dayStart)
             else {
-                DispatchQueue.main.async { completion([:]) }
+                group.leave()
+                continue
+            }
+            // We'll define "day" from 14:00 local time to the next day 14:00
+            let startTime = calendar.date(
+                bySettingHour: 14, minute: 0, second: 0, of: dayStart
+            )!
+            let endTime = calendar.date(
+                bySettingHour: 14, minute: 0, second: 0, of: nextDay
+            )!
+            fetchSleepData(startTime: startTime, endTime: endTime) {
+                segments, err in
+                guard let segments = segments, !segments.isEmpty else {
+                    group.leave()
+                    return
+                }
+                let sortedSegs = segments.sorted { $0.startDate < $1.startDate }
+                guard
+                    let earliest = sortedSegs.first,
+                    let latest = sortedSegs.last
+                else {
+                    group.leave()
+                    return
+                }
+
+                // Sum up all segments that are not "Awake"/"InBed"
+                let totalNonAwake =
+                    sortedSegs
+                    .filter { $0.stage != "Awake" && $0.stage != "InBed" }
+                    .reduce(0.0) {
+                        $0 + $1.endDate.timeIntervalSince($1.startDate)
+                    }
+
+                let totalAwake =
+                    sortedSegs
+                    .filter { $0.stage == "Awake" }
+                    .reduce(0.0) {
+                        $0 + $1.endDate.timeIntervalSince($1.startDate)
+                    }
+
+                let actualStart = earliest.startDate
+                let actualEnd = latest.endDate
+
+                self.fetchHRVDuringSleep(
+                    sleepStart: actualStart, sleepEnd: actualEnd
+                ) {
+                    hrvVal, _ in
+                    self.fetchHeartRateDuringSleep(
+                        sleepStart: actualStart, sleepEnd: actualEnd
+                    ) { rhrVal, _ in
+                        let basicScore = self.calculateSleepScore(
+                            sleepData: sortedSegs,
+                            hrv: hrvVal,
+                            rhr: rhrVal,
+                            sleepGoalMinutes: sleepGoalMinutes
+                        )
+                        let night = NightData(
+                            date: endTime,
+                            sleepScore: basicScore,
+                            hrv: hrvVal ?? 0,
+                            restingHeartRate: rhrVal ?? 0,
+                            sleepDuration: totalNonAwake,
+                            sleepStartTime: actualStart,
+                            sleepEndTime: actualEnd,
+                            totalAwakeTime: totalAwake
+                        )
+                        allNights.append(night)
+                        group.leave()
+                    }
+                }
+            }
+        }
+
+        group.notify(queue: .main) {
+            let sorted = allNights.sorted { $0.date > $1.date }
+            var updated: [NightData] = []
+
+            for target in sorted {
+                let older = sorted.filter { $0.date < target.date }
+                let baselineSet = Array(older.prefix(90))
+
+                // Calculate baseline for HRV
+                let hrvVals = baselineSet.map { $0.hrv }.filter { $0 > 0 }
+                let userHRVBaseline: Double =
+                    hrvVals.isEmpty
+                    ? 0.0
+                    : (hrvVals.reduce(0, +) / Double(hrvVals.count))
+
+                // Baseline for RHR
+                let rhrVals = baselineSet.map { $0.restingHeartRate }.filter {
+                    $0 > 0
+                }
+                let userRHRBaseline: Double =
+                    rhrVals.isEmpty
+                    ? 0.0
+                    : (rhrVals.reduce(0, +) / Double(rhrVals.count))
+
+                // Baseline bedtime (average start time)
+                let bedTimes = baselineSet.map {
+                    $0.sleepStartTime.timeIntervalSinceReferenceDate
+                }
+                let userBedtime: Date? =
+                    bedTimes.isEmpty
+                    ? nil
+                    : Date(
+                        timeIntervalSinceReferenceDate:
+                            bedTimes.reduce(0, +) / Double(bedTimes.count))
+
+                let newScore = self.advancedSleepScore(
+                    night: target,
+                    baselineHRV: userHRVBaseline,
+                    baselineRHR: userRHRBaseline,
+                    averageBedtime: userBedtime,
+                    sleepGoalMinutes: sleepGoalMinutes
+                )
+                let revised = NightData(
+                    date: target.date,
+                    sleepScore: newScore,
+                    hrv: target.hrv,
+                    restingHeartRate: target.restingHeartRate,
+                    sleepDuration: target.sleepDuration,
+                    sleepStartTime: target.sleepStartTime,
+                    sleepEndTime: target.sleepEndTime,
+                    totalAwakeTime: target.totalAwakeTime
+                )
+                updated.append(revised)
+            }
+
+            let final = updated.sorted { $0.date > $1.date }
+            completion(final)
+        }
+    }
+
+    // MARK: - Low-level Sleep Data
+
+    private func fetchSleepData(
+        startTime: Date,
+        endTime: Date,
+        completion: @escaping (
+            [(stage: String, startDate: Date, endDate: Date)]?, Error?
+        ) -> Void
+    ) {
+        let pred = HKQuery.predicateForSamples(
+            withStart: startTime, end: endTime, options: .strictStartDate)
+        let sortDescs = [
+            NSSortDescriptor(
+                key: HKSampleSortIdentifierStartDate, ascending: true),
+            NSSortDescriptor(
+                key: HKSampleSortIdentifierEndDate, ascending: true),
+        ]
+        let q = HKSampleQuery(
+            sampleType: sleepType,
+            predicate: pred,
+            limit: HKObjectQueryNoLimit,
+            sortDescriptors: sortDescs
+        ) { _, samples, error in
+            guard error == nil else {
+                DispatchQueue.main.async {
+                    completion(nil, error)
+                }
                 return
             }
-            var wakeTimes: [Date: [Double]] = [:]
-            let grouped = self.groupSamples(samples, byMonth: byMonth)
-            for (keyDate, group) in grouped {
-                let times = self.extractWakeTimes(from: group)
-                wakeTimes[keyDate] = times
+            guard let samples = samples as? [HKCategorySample], !samples.isEmpty
+            else {
+                DispatchQueue.main.async {
+                    completion([], nil)
+                }
+                return
             }
-            var result: [Date: Double] = [:]
-            for (keyDate, times) in wakeTimes {
-                let avg = times.reduce(0, +) / Double(times.count)
-                result[keyDate] = avg
+            // If multiple sources, pick the best
+            let grouped = Dictionary(grouping: samples) {
+                $0.sourceRevision.source.bundleIdentifier
             }
+            // Example heuristic: prefer the set that has REM/Deep data
+            let bestSamples =
+                grouped.max(by: { a, b in
+                    let aHasStages = a.value.contains(where: {
+                        $0.value
+                            == HKCategoryValueSleepAnalysis.asleepREM.rawValue
+                            || $0.value
+                                == HKCategoryValueSleepAnalysis.asleepDeep
+                                .rawValue
+                    })
+                    let bHasStages = b.value.contains(where: {
+                        $0.value
+                            == HKCategoryValueSleepAnalysis.asleepREM.rawValue
+                            || $0.value
+                                == HKCategoryValueSleepAnalysis.asleepDeep
+                                .rawValue
+                    })
+                    if aHasStages != bHasStages { return !aHasStages }
+                    return a.value.count < b.value.count
+                })?.value
+                ?? samples
+
+            let combined = self.mergeSleepSegments(bestSamples)
             DispatchQueue.main.async {
-                completion(result)
+                completion(combined, nil)
+            }
+        }
+        healthStore.execute(q)
+    }
+
+    private func mergeSleepSegments(
+        _ raw: [HKCategorySample]
+    ) -> [(stage: String, startDate: Date, endDate: Date)] {
+        let sorted = raw.sorted { $0.startDate < $1.startDate }
+        var result: [(stage: String, startDate: Date, endDate: Date)] = []
+        var current: (stage: String, start: Date, end: Date)?
+        for s in sorted {
+            let stageName: String
+            switch s.value {
+            case HKCategoryValueSleepAnalysis.inBed.rawValue:
+                stageName = "InBed"
+            case HKCategoryValueSleepAnalysis.asleepCore.rawValue:
+                stageName = "Core"
+            case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:
+                stageName = "Deep"
+            case HKCategoryValueSleepAnalysis.asleepREM.rawValue:
+                stageName = "REM"
+            case HKCategoryValueSleepAnalysis.awake.rawValue:
+                stageName = "Awake"
+            default:
+                stageName = "Other"
+            }
+            if let c = current {
+                // Extend if same stage overlaps
+                if c.stage == stageName && s.startDate <= c.end {
+                    let newEnd = max(c.end, s.endDate)
+                    current = (stageName, c.start, newEnd)
+                } else {
+                    result.append((c.stage, c.start, c.end))
+                    current = (stageName, s.startDate, s.endDate)
+                }
+            } else {
+                current = (stageName, s.startDate, s.endDate)
+            }
+        }
+        if let final = current {
+            result.append((final.stage, final.start, final.end))
+        }
+        return result
+    }
+
+    // MARK: - HRV & Heart Rate
+
+    private func fetchHRVDuringSleep(
+        sleepStart: Date,
+        sleepEnd: Date,
+        completion: @escaping (Double?, Error?) -> Void
+    ) {
+        let pred = HKQuery.predicateForSamples(
+            withStart: sleepStart, end: sleepEnd, options: .strictStartDate)
+        let statsQ = HKStatisticsQuery(
+            quantityType: hrvType,
+            quantitySamplePredicate: pred,
+            options: .discreteAverage
+        ) { _, stats, error in
+            guard error == nil else {
+                DispatchQueue.main.async {
+                    completion(nil, error)
+                }
+                return
+            }
+            let val = stats?.averageQuantity()?.doubleValue(
+                for: .secondUnit(with: .milli)
+            )
+            DispatchQueue.main.async {
+                completion(val, nil)
+            }
+        }
+        healthStore.execute(statsQ)
+    }
+
+    private func fetchHeartRateDuringSleep(
+        sleepStart: Date,
+        sleepEnd: Date,
+        completion: @escaping (Double?, Error?) -> Void
+    ) {
+        let pred = HKQuery.predicateForSamples(
+            withStart: sleepStart, end: sleepEnd, options: .strictStartDate)
+        let interval = DateComponents(minute: 5)
+        let query = HKStatisticsCollectionQuery(
+            quantityType: hrType,
+            quantitySamplePredicate: pred,
+            options: [.discreteAverage],
+            anchorDate: sleepStart,
+            intervalComponents: interval
+        )
+        query.initialResultsHandler = { _, results, error in
+            guard error == nil else {
+                DispatchQueue.main.async {
+                    completion(nil, error)
+                }
+                return
+            }
+            guard let results = results else {
+                DispatchQueue.main.async {
+                    completion(nil, nil)
+                }
+                return
+            }
+            var hrValues: [Double] = []
+            results.enumerateStatistics(from: sleepStart, to: sleepEnd) {
+                stats, _ in
+                if let avgQ = stats.averageQuantity() {
+                    let bpm = avgQ.doubleValue(
+                        for: HKUnit.count().unitDivided(by: .minute()))
+                    // Filter out improbable values
+                    if bpm >= 30 && bpm <= 120 {
+                        hrValues.append(bpm)
+                    }
+                }
+            }
+            guard !hrValues.isEmpty else {
+                DispatchQueue.main.async { completion(nil, nil) }
+                return
+            }
+            // Take lowest 10% to approximate resting
+            hrValues.sort()
+            let cutCount = max(1, Int(Double(hrValues.count) * 0.1))
+            let lowest = Array(hrValues.prefix(cutCount))
+            let avg = lowest.reduce(0, +) / Double(lowest.count)
+            DispatchQueue.main.async {
+                completion(avg, nil)
             }
         }
         healthStore.execute(query)
     }
 
-    private func groupSamples(_ samples: [HKCategorySample], byMonth: Bool)
-        -> [Date: [HKCategorySample]]
-    {
-        var grouped: [Date: [HKCategorySample]] = [:]
-        let calendar = Calendar.current
-        for sample in samples {
-            let comps: DateComponents
-            if byMonth {
-                let date = sample.endDate
-                comps = calendar.dateComponents([.year, .month], from: date)
-                let startOfMonth = calendar.date(from: comps) ?? date
-                grouped[startOfMonth, default: []].append(sample)
-            } else {
-                let day = calendar.startOfDay(for: sample.endDate)
-                grouped[day, default: []].append(sample)
+    // MARK: - Sleep Scores
+
+    private func calculateSleepScore(
+        sleepData: [(stage: String, startDate: Date, endDate: Date)],
+        hrv: Double?,
+        rhr: Double?,
+        sleepGoalMinutes: Int
+    ) -> Int {
+        var score = 100
+        let totalSlept =
+            sleepData
+            .filter { $0.stage != "Awake" && $0.stage != "InBed" }
+            .reduce(0.0) {
+                $0 + $1.endDate.timeIntervalSince($1.startDate)
             }
-        }
-        return grouped
-    }
-
-    private func extractWakeTimes(from samples: [HKCategorySample]) -> [Double]
-    {
-        var times: [Double] = []
-        let calendar = Calendar.current
-
-        for s in samples {
-            // Check if sample is "asleep" or "asleepUnspecified"
-            if s.value == HKCategoryValueSleepAnalysis.asleep.rawValue
-                || s.value
-                    == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue
-            {
-
-                let comps = calendar.dateComponents(
-                    [.hour, .minute], from: s.endDate)
-                let minutes = Double(
-                    (comps.hour ?? 0) * 60 + (comps.minute ?? 0))
-                times.append(minutes)
-            }
-        }
-
-        return times
-    }
-
-    /*
-    func fetchAverageScreenTime(
-        byMonth: Bool, completion: @escaping ([Date: Double]) -> Void
-    ) {
-        var result: [Date: Double] = [:]
-        let calendar = Calendar.current
-        if byMonth {
-            for monthOffset in 0..<12 {
-                if let date = calendar.date(
-                    byAdding: .month, value: -monthOffset, to: Date())
-                {
-                    let randomUsage = Double.random(in: 60...300)
-                    let startOfMonth = calendar.date(
-                        from: calendar.dateComponents(
-                            [.year, .month], from: date))!
-                    result[startOfMonth] = randomUsage
+        let byStage = Dictionary(grouping: sleepData, by: { $0.stage })
+            .mapValues { segs in
+                segs.reduce(0.0) {
+                    $0 + $1.endDate.timeIntervalSince($1.startDate)
                 }
             }
-        } else {
-            for dayOffset in 0..<30 {
-                if let date = calendar.date(
-                    byAdding: .day, value: -dayOffset, to: Date())
-                {
-                    let randomUsage = Double.random(in: 60...300)
-                    let startOfDay = calendar.startOfDay(for: date)
-                    result[startOfDay] = randomUsage
-                }
+
+        if totalSlept > 0 {
+            let deep = byStage["Deep"] ?? 0
+            let rem = byStage["REM"] ?? 0
+            let awake = byStage["Awake"] ?? 0
+            let inBed = byStage["InBed"] ?? 0
+            if (deep / totalSlept) < 0.13 { score -= 15 }
+            if (rem / totalSlept) < 0.20 { score -= 15 }
+            let totalInBed = totalSlept + awake + inBed
+            if totalInBed > 0 {
+                if (awake / totalInBed) > 0.1 { score -= 10 }
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            completion(result)
+
+        let goalSecs = Double(sleepGoalMinutes) * 60
+        if goalSecs > 0 {
+            let frac = min(1.0, totalSlept / goalSecs)
+            let durScore = Int(25.0 * frac)
+            score = score - 25 + durScore
         }
+
+        if let h = hrv, h < 30 {
+            score -= 5
+        } else if hrv == nil {
+            score -= 5
+        }
+        if let rr = rhr, rr > 100 {
+            score -= 5
+        } else if rhr == nil {
+            score -= 5
+        }
+        return max(0, min(100, score))
     }
-     */
+
+    private func advancedSleepScore(
+        night: NightData,
+        baselineHRV: Double,
+        baselineRHR: Double,
+        averageBedtime: Date?,
+        sleepGoalMinutes: Int
+    ) -> Int {
+        var score = night.sleepScore
+
+        // Compare to baseline HRV
+        if baselineHRV > 0 {
+            let ratio = night.hrv / baselineHRV
+            if ratio < 0.5 {
+                score -= 10
+            } else if ratio < 0.8 {
+                score -= 5
+            }
+        }
+
+        // Compare to baseline RHR
+        if baselineRHR > 0 {
+            let ratio = night.restingHeartRate / baselineRHR
+            if ratio > 1.3 {
+                score -= 10
+            } else if ratio > 1.1 {
+                score -= 5
+            }
+        }
+
+        // Compare user’s bedtime consistency
+        if let avgB = averageBedtime {
+            let mismatch = abs(night.sleepStartTime.timeIntervalSince(avgB))
+            if mismatch > (4 * 3600) {
+                score -= 10
+            } else if mismatch > (2 * 3600) {
+                score -= 5
+            }
+        }
+
+        // Under 5 hours total => minor penalty
+        if night.sleepDuration < 5.0 * 3600.0 {
+            score -= 5
+        }
+
+        return max(0, min(100, score))
+    }
 }
