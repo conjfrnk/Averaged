@@ -18,53 +18,61 @@ struct YearlyView: View {
             Text("Yearly Sleep Data")
                 .font(.headline)
 
-            Chart {
-                // Plot actual data for any month that has it
-                ForEach(monthlyWakeTimes) { item in
-                    LineMark(
-                        x: .value("Month", item.date),
-                        y: .value("Wake Time", item.wakeMinutes)
-                    )
-                    .foregroundStyle(.green)
+            // If no data, show placeholder. Otherwise, show the chart.
+            if monthlyWakeTimes.isEmpty {
+                Text("No data for this year")
+                    .foregroundColor(.secondary)
+                    .frame(height: 200)
+            } else {
+                Chart {
+                    // Plot actual data for any month that has it
+                    ForEach(monthlyWakeTimes) { item in
+                        LineMark(
+                            x: .value("Month", item.date),
+                            y: .value("Wake Time", item.wakeMinutes)
+                        )
+                        .foregroundStyle(.green)
 
-                    PointMark(
-                        x: .value("Month", item.date),
-                        y: .value("Wake Time", item.wakeMinutes)
-                    )
-                    .foregroundStyle(.green)
+                        PointMark(
+                            x: .value("Month", item.date),
+                            y: .value("Wake Time", item.wakeMinutes)
+                        )
+                        .foregroundStyle(.green)
+                    }
+
+                    // Green dashed line for goal
+                    RuleMark(y: .value("Goal Wake", goalWakeMinutes))
+                        .lineStyle(.init(lineWidth: 2, dash: [5]))
+                        .foregroundStyle(.green.opacity(0.8))
                 }
-
-                // Green dashed line for goal
-                RuleMark(y: .value("Goal Wake", goalWakeMinutes))
-                    .lineStyle(.init(lineWidth: 2, dash: [5]))
-                    .foregroundStyle(.green.opacity(0.8))
-            }
-            .chartXScale(domain: currentYearDomain())
-            .chartXAxis {
-                // We’ll have a tick for each month from Jan to Dec
-                AxisMarks(values: .stride(by: .month)) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let date = value.as(Date.self) {
-                            Text(singleLetterMonth(date))
+                .chartXScale(domain: currentYearDomain())
+                .chartXAxis {
+                    // Tick for each month from Jan to Dec
+                    AxisMarks(values: .stride(by: .month)) { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let date = value.as(Date.self) {
+                                Text(singleLetterMonth(date))
+                            }
                         }
                     }
                 }
-            }
-            .chartYScale(domain: yearlyYDomain())
-            .chartYAxis {
-                AxisMarks(position: .leading) { val in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let rawVal = val.as(Double.self) {
-                            Text(minutesToTime(rawVal))
+                .chartYScale(domain: yearlyYDomain())
+                .chartYAxis {
+                    AxisMarks(position: .leading) { val in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let rawVal = val.as(Double.self) {
+                                Text(minutesToTime(rawVal))
+                            }
                         }
                     }
                 }
+                .frame(height: 200)
             }
-            .frame(height: 200)
 
-            if let avg = computeAverageWakeTime() {
+            // If there's data, show average; else "N/A"
+            if let avg = computeAverageWakeTime(), !monthlyWakeTimes.isEmpty {
                 let txt = minutesToTime(avg)
                 HStack {
                     Text("Yearly Avg Wake Time: \(txt)")
@@ -91,22 +99,27 @@ struct YearlyView: View {
             let epoch = UserDefaults.standard.double(forKey: "goalWakeTime")
             if epoch > 0 {
                 let date = Date(timeIntervalSince1970: epoch)
-                let comps = Calendar.current.dateComponents([.hour, .minute], from: date)
-                goalWakeMinutes = Double((comps.hour ?? 6) * 60 + (comps.minute ?? 0))
+                let comps = Calendar.current.dateComponents(
+                    [.hour, .minute], from: date)
+                goalWakeMinutes = Double(
+                    (comps.hour ?? 6) * 60 + (comps.minute ?? 0))
             }
         }
     }
 
     private func loadMonthlyData() {
         // We'll fetch a full year’s worth of nights
-        healthDataManager.fetchNightsOverLastNDays(365, sleepGoalMinutes: 480) { nights in
+        healthDataManager.fetchNightsOverLastNDays(365, sleepGoalMinutes: 480) {
+            nights in
             let calendar = Calendar.current
             let now = Date()
             let year = calendar.component(.year, from: now)
 
             // We'll group only nights that fall in the CURRENT year
-            let january1 = calendar.date(from: DateComponents(year: year, month: 1, day: 1))!
-            let december31 = calendar.date(from: DateComponents(year: year, month: 12, day: 31))!
+            let january1 = calendar.date(
+                from: DateComponents(year: year, month: 1, day: 1))!
+            let december31 = calendar.date(
+                from: DateComponents(year: year, month: 12, day: 31))!
 
             let nightsInCurrentYear = nights.filter {
                 $0.sleepEndTime >= january1 && $0.sleepEndTime <= december31
@@ -114,38 +127,41 @@ struct YearlyView: View {
 
             // Group by (month) → [wakeMinutes]
             var grouped: [Date: [Double]] = [:]
-
             for night in nightsInCurrentYear {
-                // This night’s month
-                let comps = calendar.dateComponents([.year, .month], from: night.sleepEndTime)
-                guard let startOfMonth = calendar.date(from: comps) else { continue }
+                let comps = calendar.dateComponents(
+                    [.year, .month], from: night.sleepEndTime)
+                guard let startOfMonth = calendar.date(from: comps) else {
+                    continue
+                }
 
                 // Convert final wake time → minutes from midnight
                 let hour = calendar.component(.hour, from: night.sleepEndTime)
-                let min  = calendar.component(.minute, from: night.sleepEndTime)
+                let min = calendar.component(.minute, from: night.sleepEndTime)
                 let wakeMins = Double(hour * 60 + min)
 
                 grouped[startOfMonth, default: []].append(wakeMins)
             }
 
             // For each month from 1...12 in the current year,
-            // only add to monthlyWakeTimes if data is present
+            // only add an entry if there's data
             var temp: [MonthlyWakeData] = []
             for month in 1...12 {
-                guard let thisMonthDate = calendar.date(
-                    from: DateComponents(year: year, month: month, day: 1)
-                ) else {
+                guard
+                    let thisMonthDate = calendar.date(
+                        from: DateComponents(year: year, month: month, day: 1))
+                else {
                     continue
                 }
-                // If there's no data for this month, skip it
                 guard let arr = grouped[thisMonthDate], !arr.isEmpty else {
+                    // Skip months with no data
                     continue
                 }
                 let avg = arr.reduce(0, +) / Double(arr.count)
-                temp.append(MonthlyWakeData(date: thisMonthDate, wakeMinutes: avg))
+                temp.append(
+                    MonthlyWakeData(date: thisMonthDate, wakeMinutes: avg))
             }
 
-            // Sort by chronological
+            // Sort chronologically
             monthlyWakeTimes = temp.sorted { $0.date < $1.date }
         }
     }
@@ -154,7 +170,6 @@ struct YearlyView: View {
         // Only average the months that have real data
         guard !monthlyWakeTimes.isEmpty else { return nil }
 
-        // If monthlyWakeTimes has e.g. 3 months, we average their `wakeMinutes`
         let sum = monthlyWakeTimes.reduce(0.0) { $0 + $1.wakeMinutes }
         let avg = sum / Double(monthlyWakeTimes.count)
         return avg.isNaN || avg.isInfinite ? nil : avg
@@ -170,15 +185,15 @@ struct YearlyView: View {
     private func singleLetterMonth(_ date: Date) -> String {
         let month = Calendar.current.component(.month, from: date)
         switch month {
-        case 1:  return "J"
-        case 2:  return "F"
-        case 3:  return "M"
-        case 4:  return "A"
-        case 5:  return "M"
-        case 6:  return "J"
-        case 7:  return "J"
-        case 8:  return "A"
-        case 9:  return "S"
+        case 1: return "J"
+        case 2: return "F"
+        case 3: return "M"
+        case 4: return "A"
+        case 5: return "M"
+        case 6: return "J"
+        case 7: return "J"
+        case 8: return "A"
+        case 9: return "S"
         case 10: return "O"
         case 11: return "N"
         case 12: return "D"
@@ -191,15 +206,16 @@ struct YearlyView: View {
         let calendar = Calendar.current
         let year = calendar.component(.year, from: Date())
 
-        let january1 = calendar.date(from: DateComponents(year: year, month: 1, day: 1))!
-        let december31 = calendar.date(from: DateComponents(year: year, month: 12, day: 31))!
+        let january1 = calendar.date(
+            from: DateComponents(year: year, month: 1, day: 1))!
+        let december31 = calendar.date(
+            from: DateComponents(year: year, month: 12, day: 31))!
 
         return january1...december31
     }
 
     private func yearlyYDomain() -> ClosedRange<Double> {
-        // Among the months we do have, find min & max
-        // Also ensure the goalWakeMinutes is included
+        // Include the user’s goal wake time
         let rawVals = monthlyWakeTimes.map { $0.wakeMinutes }
         let allVals = rawVals + [goalWakeMinutes]
 
@@ -208,10 +224,10 @@ struct YearlyView: View {
         let minVal = allVals.min()!
         let maxVal = allVals.max()!
         let minFloor = Double(Int(minVal / 30) * 30) - 30
-        let maxCeil  = Double(Int(maxVal / 30) * 30) + 30
+        let maxCeil = Double(Int(maxVal / 30) * 30) + 30
 
-        let lower    = max(0, minFloor)
-        let upper    = min(Double(24 * 60), maxCeil)
+        let lower = max(0, minFloor)
+        let upper = min(Double(24 * 60), maxCeil)
         return lower...upper
     }
 }
