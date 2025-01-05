@@ -57,7 +57,7 @@ struct YearlyView: View {
                     AxisGridLine()
                     AxisValueLabel {
                         if let rawVal = val.as(Double.self) {
-                            Text(minutesToHHmm(rawVal))
+                            Text(minutesToTime(rawVal))
                         }
                     }
                 }
@@ -65,7 +65,7 @@ struct YearlyView: View {
             .frame(height: 200)
 
             if let avg = computeAverageWakeTime() {
-                let txt = minutesToHHmm(avg)
+                let txt = minutesToTime(avg)
                 HStack {
                     Text("Yearly Avg Wake Time: \(txt)")
                     if avg <= goalWakeMinutes {
@@ -160,11 +160,11 @@ struct YearlyView: View {
         return avg.isNaN || avg.isInfinite ? nil : avg
     }
 
-    private func minutesToHHmm(_ val: Double) -> String {
+    private func minutesToTime(_ val: Double) -> String {
         if val.isNaN || val.isInfinite { return "N/A" }
         let h = Int(val / 60)
         let m = Int(val) % 60
-        return String(format: "%dh %02dm", h, m)
+        return String(format: "%d:%02d", h, m)
     }
 
     private func singleLetterMonth(_ date: Date) -> String {

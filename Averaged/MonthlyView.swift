@@ -81,7 +81,7 @@ struct MonthlyView: View {
             if let avgWake = computeAverage(dailyWakeTimes.map(\.wakeMinutes)) {
                 let formatted = minutesToHHmm(avgWake)
                 HStack {
-                    Text("Monthly Avg Wake: \(formatted)")
+                    Text("Monthly Avg Wake Time: \(formatted)")
                     if avgWake <= goalWakeMinutes {
                         Image(systemName: "arrow.down.circle.fill")
                             .foregroundColor(.green)
@@ -91,7 +91,7 @@ struct MonthlyView: View {
                     }
                 }
             } else {
-                Text("Monthly Avg Wake: N/A")
+                Text("Monthly Avg Wake Time: N/A")
             }
 
             Spacer()
