@@ -15,15 +15,22 @@ struct MonthlyView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("Monthly Wake Times")
+            Text("Wake Time")
                 .font(.headline)
-
             if dailyWakeTimes.isEmpty {
                 Text("No data for this month")
                     .foregroundColor(.secondary)
                     .frame(height: 300)
             } else {
                 Chart {
+                    if let avg = computeAverage(
+                        dailyWakeTimes.map(\.wakeMinutes)),
+                        !dailyWakeTimes.isEmpty
+                    {
+                        RuleMark(y: .value("Monthly Average", avg))
+                            .lineStyle(.init(lineWidth: 2, dash: [5]))
+                            .foregroundStyle(.blue.opacity(0.8))
+                    }
                     ForEach(dailyWakeTimes) { item in
                         LineMark(
                             x: .value("Day", item.date),
@@ -35,7 +42,8 @@ struct MonthlyView: View {
                             y: .value("Wake Time", item.wakeMinutes)
                         )
                         .foregroundStyle(
-                            item.wakeMinutes <= goalWakeMinutes ? .green : .red)
+                            item.wakeMinutes <= goalWakeMinutes ? .green : .red
+                        )
                     }
                     RuleMark(y: .value("Goal Wake", goalWakeMinutes))
                         .lineStyle(.init(lineWidth: 2, dash: [5]))
@@ -45,7 +53,6 @@ struct MonthlyView: View {
                 .chartXAxis {
                     AxisMarks(values: .stride(by: .day)) { _ in
                         AxisGridLine()
-                        AxisValueLabel(centered: true) { Text("") }
                     }
                 }
                 .chartYScale(
@@ -70,13 +77,12 @@ struct MonthlyView: View {
                 }
                 .frame(height: 300)
             }
-
             if let avg = computeAverage(dailyWakeTimes.map(\.wakeMinutes)),
                 !dailyWakeTimes.isEmpty
             {
                 let formatted = minutesToHHmm(avg)
                 HStack {
-                    Text("Monthly Avg Wake Time: \(formatted)")
+                    Text("Average Wake Time: \(formatted)")
                     if avg > goalWakeMinutes {
                         Image(systemName: "arrow.up.circle.fill")
                             .foregroundColor(.red)
@@ -86,9 +92,8 @@ struct MonthlyView: View {
                     }
                 }
             } else {
-                Text("Monthly Avg Wake Time: N/A")
+                Text("Average Wake Time: N/A")
             }
-
             Spacer()
         }
         .padding()
@@ -136,10 +141,11 @@ struct MonthlyView: View {
             guard let wt = data.wakeTime else {
                 return DailyWakeData(date: data.date, wakeMinutes: 0)
             }
+            let dayOnly = Calendar.current.startOfDay(for: wt)
             let comps = Calendar.current.dateComponents(
                 [.hour, .minute], from: wt)
             let mins = Double((comps.hour ?? 0) * 60 + (comps.minute ?? 0))
-            return DailyWakeData(date: wt, wakeMinutes: mins)
+            return DailyWakeData(date: dayOnly, wakeMinutes: mins)
         }
         dailyWakeTimes = mapped
     }
@@ -194,8 +200,7 @@ struct MonthlyView: View {
         guard !values.isEmpty else { return nil }
         let sum = values.reduce(0, +)
         let avg = sum / Double(values.count)
-        if avg.isNaN || avg.isInfinite { return nil }
-        return avg
+        return avg.isNaN || avg.isInfinite ? nil : avg
     }
 
     private func minutesToHHmm(_ val: Double) -> String {

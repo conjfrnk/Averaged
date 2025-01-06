@@ -15,15 +15,21 @@ struct YearlyView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("Yearly Wake Times")
+            Text("Wake Time")
                 .font(.headline)
-
             if monthlyWakeTimes.isEmpty {
                 Text("No data for this year")
                     .foregroundColor(.secondary)
                     .frame(height: 200)
             } else {
                 Chart {
+                    if let yearlyAvg = computeAverageWakeTime(),
+                        !monthlyWakeTimes.isEmpty
+                    {
+                        RuleMark(y: .value("Yearly Average", yearlyAvg))
+                            .lineStyle(.init(lineWidth: 2, dash: [5]))
+                            .foregroundStyle(.blue.opacity(0.8))
+                    }
                     ForEach(monthlyWakeTimes) { item in
                         LineMark(
                             x: .value("Month", item.date),
@@ -35,7 +41,8 @@ struct YearlyView: View {
                             y: .value("Wake Time", item.wakeMinutes)
                         )
                         .foregroundStyle(
-                            item.wakeMinutes <= goalWakeMinutes ? .green : .red)
+                            item.wakeMinutes <= goalWakeMinutes ? .green : .red
+                        )
                     }
                     RuleMark(y: .value("Goal Wake", goalWakeMinutes))
                         .lineStyle(.init(lineWidth: 2, dash: [5]))
@@ -65,11 +72,10 @@ struct YearlyView: View {
                 }
                 .frame(height: 200)
             }
-
             if let avg = computeAverageWakeTime(), !monthlyWakeTimes.isEmpty {
                 let txt = minutesToHHmm(avg)
                 HStack {
-                    Text("Yearly Avg Wake Time: \(txt)")
+                    Text("Average Wake Time: \(txt)")
                     if avg > goalWakeMinutes {
                         Image(systemName: "arrow.up.circle.fill")
                             .foregroundColor(.red)
@@ -79,9 +85,8 @@ struct YearlyView: View {
                     }
                 }
             } else {
-                Text("Yearly Avg Wake Time: N/A")
+                Text("Average Wake Time: N/A")
             }
-
             Spacer()
         }
         .padding()
