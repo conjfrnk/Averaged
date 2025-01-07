@@ -16,18 +16,24 @@ struct ScreenTimeDetailView: View {
     @State private var hours: Int = 0
     @State private var mins: Int = 0
 
+    @State private var existingRecordMinutes: Int? = nil
+
     var body: some View {
         NavigationView {
             VStack(spacing: 16) {
                 Text("Add or Edit Screen Time")
                     .font(.headline)
+
                 DatePicker(
                     "Select Date", selection: $selectedDate,
                     displayedComponents: .date
                 )
                 .datePickerStyle(.graphical)
+                .onChange(of: selectedDate) { oldDate, newDate in
+                    loadRecord(for: newDate)
+                }
 
-                Text("Select Time Spent")
+                Text(actionText)
                     .font(.subheadline)
 
                 HStack(spacing: 20) {
@@ -76,6 +82,7 @@ struct ScreenTimeDetailView: View {
                     }
                 }
                 .buttonStyle(.bordered)
+
                 Spacer()
             }
             .padding()
@@ -89,14 +96,24 @@ struct ScreenTimeDetailView: View {
             .onAppear {
                 if let emptyDate = firstEmptyDayInCurrentYear() {
                     selectedDate = emptyDate
-                    loadRecord(for: emptyDate)
                 }
+                loadRecord(for: selectedDate)
             }
         }
     }
 
+    private var actionText: String {
+        guard let minutes = existingRecordMinutes, minutes >= 0 else {
+            return "Select Time Spent"
+        }
+        let hr = minutes / 60
+        let mn = minutes % 60
+        return String(format: "Edit Time Spent (previously %d:%02d)", hr, mn)
+    }
+
     func loadRecord(for date: Date) {
         if let rec = manager.fetchRecord(for: date) {
+            existingRecordMinutes = Int(rec.minutes)
             if rec.minutes >= 0 {
                 let total = Int(rec.minutes)
                 hours = total / 60
@@ -106,15 +123,10 @@ struct ScreenTimeDetailView: View {
                 mins = 0
             }
         } else {
+            existingRecordMinutes = nil
             hours = 0
             mins = 0
         }
-    }
-
-    func dateString(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateStyle = .medium
-        return f.string(from: date)
     }
 
     func firstEmptyDayInCurrentYear() -> Date? {
