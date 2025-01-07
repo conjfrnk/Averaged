@@ -70,7 +70,10 @@ struct MonthlyView: View {
                     }
                     .chartXScale(domain: monthlyXDomain())
                     .chartXAxis {
-                        AxisMarks(values: .stride(by: .day))
+                        AxisMarks(values: .stride(by: .day)) {
+                            AxisGridLine()
+                            AxisValueLabel { Text("") }
+                        }
                     }
                     .frame(height: 300)
                 }
@@ -142,7 +145,10 @@ struct MonthlyView: View {
                     }
                     .chartXScale(domain: monthlyXDomain())
                     .chartXAxis {
-                        AxisMarks(values: .stride(by: .day))
+                        AxisMarks(values: .stride(by: .day)) {
+                            AxisGridLine()
+                            AxisValueLabel { Text("") }
+                        }
                     }
                     .frame(height: 300)
                 }

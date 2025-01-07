@@ -11,8 +11,10 @@ struct ScreenTimeDetailView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var manager = ScreenTimeDataManager.shared
     @AppStorage("screenTimeGoal") private var screenTimeGoal: Int = 120
+
     @State private var selectedDate = Date()
-    @State private var minutes: Int = 0
+    @State private var hours: Int = 0
+    @State private var mins: Int = 0
 
     var body: some View {
         NavigationView {
@@ -24,17 +26,57 @@ struct ScreenTimeDetailView: View {
                     displayedComponents: .date
                 )
                 .datePickerStyle(.graphical)
-                Stepper(
-                    "Minutes: \(minutes)", value: $minutes, in: 0...1440,
-                    step: 15
-                )
-                .padding()
+
+                Text("Select Time Spent")
+                    .font(.subheadline)
+
+                HStack(spacing: 20) {
+                    VStack {
+                        Text("Hours")
+                        Picker("Hours", selection: $hours) {
+                            ForEach(0..<24, id: \.self) { hr in
+                                Text("\(hr)").tag(hr)
+                            }
+                        }
+                        .frame(width: 70, height: 120)
+                        .clipped()
+                        .pickerStyle(.wheel)
+                    }
+                    VStack {
+                        Text("Minutes")
+                        Picker("Minutes", selection: $mins) {
+                            ForEach(
+                                Array(stride(from: 0, through: 59, by: 5)),
+                                id: \.self
+                            ) { m in
+                                Text("\(m)").tag(m)
+                            }
+                        }
+                        .frame(width: 70, height: 120)
+                        .clipped()
+                        .pickerStyle(.wheel)
+                    }
+                }
+
                 Button("Save") {
+                    let totalMinutes = hours * 60 + mins
                     manager.addOrUpdateScreenTime(
-                        date: selectedDate, minutes: minutes)
+                        date: selectedDate, minutes: totalMinutes)
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
+
+                Button("Skip Day") {
+                    manager.skipDay(date: selectedDate)
+                    if let next = firstEmptyDayInCurrentYear() {
+                        selectedDate = next
+                        loadRecord(for: next)
+                    } else {
+                        dismiss()
+                    }
+                }
+                .buttonStyle(.bordered)
+
                 Divider()
                 Text("Logged Screen Time")
                     .font(.headline)
@@ -47,14 +89,19 @@ struct ScreenTimeDetailView: View {
                         HStack {
                             Text(dateString(record.date ?? Date()))
                             Spacer()
-                            Text("\(record.minutes) min")
-                                .foregroundColor(.secondary)
+                            if record.minutes == -1 {
+                                Text("Skipped")
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Text("\(record.minutes) min")
+                                    .foregroundColor(.secondary)
+                            }
                         }
                         .onTapGesture {
                             if let d = record.date {
                                 selectedDate = d
+                                loadRecord(for: d)
                             }
-                            minutes = Int(record.minutes)
                         }
                     }
                     .onDelete { indices in
@@ -69,7 +116,6 @@ struct ScreenTimeDetailView: View {
                 Spacer()
             }
             .padding()
-            .navigationBarTitle("Screen Time Details", displayMode: .inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
@@ -80,8 +126,25 @@ struct ScreenTimeDetailView: View {
             .onAppear {
                 if let emptyDate = firstEmptyDayInCurrentYear() {
                     selectedDate = emptyDate
+                    loadRecord(for: emptyDate)
                 }
             }
+        }
+    }
+
+    func loadRecord(for date: Date) {
+        if let rec = manager.fetchRecord(for: date) {
+            if rec.minutes >= 0 {
+                let total = Int(rec.minutes)
+                hours = total / 60
+                mins = total % 60
+            } else {
+                hours = 0
+                mins = 0
+            }
+        } else {
+            hours = 0
+            mins = 0
         }
     }
 
@@ -101,7 +164,8 @@ struct ScreenTimeDetailView: View {
         else { return nil }
         var day = jan1
         while day <= now {
-            if manager.fetchRecord(for: day) == nil {
+            if !manager.isSkippedDay(day), manager.fetchRecord(for: day) == nil
+            {
                 return day
             }
             guard let next = cal.date(byAdding: .day, value: 1, to: day) else {

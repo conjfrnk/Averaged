@@ -40,6 +40,15 @@ class ScreenTimeDataManager: ObservableObject {
         saveContext()
     }
 
+    func skipDay(date: Date) {
+        let record =
+            fetchRecord(for: date)
+            ?? ScreenTimeRecord(context: container.viewContext)
+        record.date = Calendar.current.startOfDay(for: date)
+        record.minutes = -1
+        saveContext()
+    }
+
     func fetchRecord(for date: Date) -> ScreenTimeRecord? {
         let request: NSFetchRequest<ScreenTimeRecord> =
             ScreenTimeRecord.fetchRequest()
@@ -50,7 +59,14 @@ class ScreenTimeDataManager: ObservableObject {
             format: "date >= %@ AND date < %@", dayStart as NSDate,
             dayEnd as NSDate)
         request.fetchLimit = 1
-        return try? container.viewContext.fetch(request).first
+        return (try? container.viewContext.fetch(request))?.first
+    }
+
+    func isSkippedDay(_ date: Date) -> Bool {
+        if let rec = fetchRecord(for: date) {
+            return rec.minutes == -1
+        }
+        return false
     }
 
     func delete(_ record: ScreenTimeRecord) {
