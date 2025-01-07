@@ -15,27 +15,25 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Main tab bar
                 TabView(selection: $selectedTab) {
-
                     YearlyView()
                         .tabItem {
-                            Label(
-                                "Yearly",
-                                systemImage: "chart.line.text.clipboard")
+                            Label("Yearly", systemImage: "chart.line.text.clipboard")
                         }
                         .tag(0)
-
                     MonthlyView()
                         .tabItem {
                             Label("Monthly", systemImage: "calendar")
                         }
                         .tag(1)
+                    MetricsView()
+                        .tabItem {
+                            Label("Metrics", systemImage: "list.bullet.rectangle.fill")
+                        }
+                        .tag(2)
                 }
             }
-            .navigationTitle("Averaged")
             .toolbar {
-                // Info button (left)
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
                         showInfo.toggle()
@@ -43,8 +41,6 @@ struct ContentView: View {
                         Image(systemName: "info.circle")
                     }
                 }
-
-                // Settings button (right)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         showSettings.toggle()
@@ -53,18 +49,12 @@ struct ContentView: View {
                     }
                 }
             }
-            // Present the InfoView as a sheet
             .sheet(isPresented: $showInfo) {
                 InfoView()
             }
-            // Present the SettingsView as a sheet (placeholder)
             .sheet(isPresented: $showSettings) {
                 SettingsView()
             }
         }
     }
-}
-
-#Preview {
-    ContentView()
 }
