@@ -20,7 +20,8 @@ class ScreenTimeDataManager: ObservableObject {
     }
 
     func fetchAllScreenTime() {
-        let request: NSFetchRequest<ScreenTimeRecord> = ScreenTimeRecord.fetchRequest()
+        let request: NSFetchRequest<ScreenTimeRecord> =
+            ScreenTimeRecord.fetchRequest()
         let sort = NSSortDescriptor(key: "date", ascending: false)
         request.sortDescriptors = [sort]
         if let results = try? container.viewContext.fetch(request) {
@@ -31,17 +32,23 @@ class ScreenTimeDataManager: ObservableObject {
     }
 
     func addOrUpdateScreenTime(date: Date, minutes: Int) {
-        let record = fetchRecord(for: date) ?? ScreenTimeRecord(context: container.viewContext)
+        let record =
+            fetchRecord(for: date)
+            ?? ScreenTimeRecord(context: container.viewContext)
         record.date = Calendar.current.startOfDay(for: date)
         record.minutes = Int32(minutes)
         saveContext()
     }
 
     func fetchRecord(for date: Date) -> ScreenTimeRecord? {
-        let request: NSFetchRequest<ScreenTimeRecord> = ScreenTimeRecord.fetchRequest()
+        let request: NSFetchRequest<ScreenTimeRecord> =
+            ScreenTimeRecord.fetchRequest()
         let dayStart = Calendar.current.startOfDay(for: date)
-        let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: dayStart)!
-        request.predicate = NSPredicate(format: "date >= %@ AND date < %@", dayStart as NSDate, dayEnd as NSDate)
+        let dayEnd = Calendar.current.date(
+            byAdding: .day, value: 1, to: dayStart)!
+        request.predicate = NSPredicate(
+            format: "date >= %@ AND date < %@", dayStart as NSDate,
+            dayEnd as NSDate)
         request.fetchLimit = 1
         return try? container.viewContext.fetch(request).first
     }

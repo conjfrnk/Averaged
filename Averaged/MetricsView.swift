@@ -31,13 +31,6 @@ struct MetricsView: View {
                 }
                 .listStyle(InsetGroupedListStyle())
             }
-            .navigationTitle("Metrics")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Stepper("Goal: \(screenTimeGoal) min", value: $screenTimeGoal, in: 0...1440, step: 15)
-                        .labelsHidden()
-                }
-            }
             .sheet(isPresented: $showScreenTimeDetail) {
                 ScreenTimeDetailView()
             }

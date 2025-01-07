@@ -4,6 +4,7 @@
 //
 //  Created by Connor Frank on 1/6/25.
 //
+
 import Foundation
 
 struct DailyWakeData: Identifiable {

@@ -19,12 +19,19 @@ struct ScreenTimeDetailView: View {
             VStack(spacing: 16) {
                 Text("Add or Edit Screen Time")
                     .font(.headline)
-                DatePicker("Select Date", selection: $selectedDate, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                Stepper("Minutes: \(minutes)", value: $minutes, in: 0...1440, step: 15)
-                    .padding()
+                DatePicker(
+                    "Select Date", selection: $selectedDate,
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.graphical)
+                Stepper(
+                    "Minutes: \(minutes)", value: $minutes, in: 0...1440,
+                    step: 15
+                )
+                .padding()
                 Button("Save") {
-                    manager.addOrUpdateScreenTime(date: selectedDate, minutes: minutes)
+                    manager.addOrUpdateScreenTime(
+                        date: selectedDate, minutes: minutes)
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
@@ -32,7 +39,11 @@ struct ScreenTimeDetailView: View {
                 Text("Logged Screen Time")
                     .font(.headline)
                 List {
-                    ForEach(manager.allScreenTimeData.sorted(by: { $0.date ?? Date() > $1.date ?? Date() })) { record in
+                    ForEach(
+                        manager.allScreenTimeData.sorted(by: {
+                            $0.date ?? Date() > $1.date ?? Date()
+                        })
+                    ) { record in
                         HStack {
                             Text(dateString(record.date ?? Date()))
                             Spacer()
@@ -47,7 +58,9 @@ struct ScreenTimeDetailView: View {
                         }
                     }
                     .onDelete { indices in
-                        let items = indices.map { manager.allScreenTimeData[$0] }
+                        let items = indices.map {
+                            manager.allScreenTimeData[$0]
+                        }
                         for item in items {
                             manager.delete(item)
                         }
@@ -82,13 +95,18 @@ struct ScreenTimeDetailView: View {
         let cal = Calendar.current
         let now = Date()
         let year = cal.component(.year, from: now)
-        guard let jan1 = cal.date(from: DateComponents(year: year, month: 1, day: 1)) else { return nil }
+        guard
+            let jan1 = cal.date(
+                from: DateComponents(year: year, month: 1, day: 1))
+        else { return nil }
         var day = jan1
         while day <= now {
             if manager.fetchRecord(for: day) == nil {
                 return day
             }
-            guard let next = cal.date(byAdding: .day, value: 1, to: day) else { break }
+            guard let next = cal.date(byAdding: .day, value: 1, to: day) else {
+                break
+            }
             day = next
         }
         return nil

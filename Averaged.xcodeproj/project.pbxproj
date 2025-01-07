@@ -29,9 +29,22 @@
 		B34A73DB2D1FA034003E8625 /* AveragedUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AveragedUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B3423B192D2CE8020016E2EC /* Exceptions for "Averaged" folder in "Averaged" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				ScreenTimeModel.xcdatamodeld,
+			);
+			target = B34A73C02D1FA032003E8625 /* Averaged */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B34A73C32D1FA032003E8625 /* Averaged */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B3423B192D2CE8020016E2EC /* Exceptions for "Averaged" folder in "Averaged" target */,
+			);
 			path = Averaged;
 			sourceTree = "<group>";
 		};
