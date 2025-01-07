@@ -76,43 +76,6 @@ struct ScreenTimeDetailView: View {
                     }
                 }
                 .buttonStyle(.bordered)
-
-                Divider()
-                Text("Logged Screen Time")
-                    .font(.headline)
-                List {
-                    ForEach(
-                        manager.allScreenTimeData.sorted(by: {
-                            $0.date ?? Date() > $1.date ?? Date()
-                        })
-                    ) { record in
-                        HStack {
-                            Text(dateString(record.date ?? Date()))
-                            Spacer()
-                            if record.minutes == -1 {
-                                Text("Skipped")
-                                    .foregroundColor(.secondary)
-                            } else {
-                                Text("\(record.minutes) min")
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .onTapGesture {
-                            if let d = record.date {
-                                selectedDate = d
-                                loadRecord(for: d)
-                            }
-                        }
-                    }
-                    .onDelete { indices in
-                        let items = indices.map {
-                            manager.allScreenTimeData[$0]
-                        }
-                        for item in items {
-                            manager.delete(item)
-                        }
-                    }
-                }
                 Spacer()
             }
             .padding()
