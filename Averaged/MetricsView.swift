@@ -5,47 +5,17 @@
 //  Created by Connor Frank on 1/6/25.
 //
 
-import DeviceActivity
 import SwiftUI
-
-extension DeviceActivityReport.Context {
-    static let totalActivity = Self("Total Activity")
-}
 
 struct MetricsView: View {
     @EnvironmentObject var healthDataManager: HealthDataManager
-    @EnvironmentObject var autoScreenTime: AutoScreenTimeManager
     @ObservedObject private var screenTimeManager = ScreenTimeDataManager.shared
     @AppStorage("screenTimeGoal") private var screenTimeGoal: Int = 120
     @State private var showScreenTimeDetail = false
     @State private var goalWakeMinutes: Double = 360
-    @State private var screenTimeFilter = DeviceActivityFilter(
-        segment: .daily(
-            during: {
-                let cal = Calendar.current
-                let now = Date()
-                let start = cal.dateComponents(
-                    [.hour, .minute, .second], from: cal.startOfDay(for: now))
-                var end = start
-                end.hour = 23
-                end.minute = 59
-                end.second = 59
-                return DateInterval(
-                    start: cal.date(from: start) ?? now,
-                    end: cal.date(from: end) ?? now)
-            }()
-        )
-    )
 
     var body: some View {
         List {
-            if autoScreenTime.isAuthorized {
-                Section("Today's Screen Time") {
-                    DeviceActivityReport(.totalActivity, filter: screenTimeFilter)
-                        .frame(height: 100)
-                }
-            }
-
             Section("Streaks") {
                 HStack {
                     Label("Current Goal Streak", systemImage: "flame.fill")

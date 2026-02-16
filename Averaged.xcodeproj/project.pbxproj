@@ -155,12 +155,10 @@
 				B34A73BD2D1FA032003E8625 /* Sources */,
 				B34A73BE2D1FA032003E8625 /* Frameworks */,
 				B34A73BF2D1FA032003E8625 /* Resources */,
-				B3AA000C2D928004003E8625 /* Embed Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				B3AA000B2D928008003E8625 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				B34A73C32D1FA032003E8625 /* Averaged */,
