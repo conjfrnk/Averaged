@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B3AA000D2D928001003E8625 /* ScreenTimeReport.appex in Embed Extensions */ = {isa = PBXBuildFile; fileRef = B3AA00022D928002003E8625 /* ScreenTimeReport.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		B34A73D22D1FA034003E8625 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,12 +25,34 @@
 			remoteGlobalIDString = B34A73C02D1FA032003E8625;
 			remoteInfo = Averaged;
 		};
+		B3AA000A2D928003003E8625 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B34A73B92D1FA032003E8625 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B3AA00062D928006003E8625;
+			remoteInfo = ScreenTimeReport;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B3AA000C2D928004003E8625 /* Embed Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B3AA000D2D928001003E8625 /* ScreenTimeReport.appex in Embed Extensions */,
+			);
+			name = "Embed Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		B34A73C12D1FA032003E8625 /* Averaged.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Averaged.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B34A73D12D1FA034003E8625 /* AveragedTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AveragedTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B34A73DB2D1FA034003E8625 /* AveragedUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AveragedUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B3AA00022D928002003E8625 /* ScreenTimeReport.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ScreenTimeReport.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -45,7 +71,25 @@
 			path = AveragedUITests;
 			sourceTree = "<group>";
 		};
+		B3AA00012D928005003E8625 /* ScreenTimeReport */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B3AA000A2D92800C003E8625 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+			);
+			path = ScreenTimeReport;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B3AA000A2D92800C003E8625 = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B3AA00062D928006003E8625 /* ScreenTimeReport */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		B34A73BE2D1FA032003E8625 /* Frameworks */ = {
@@ -69,6 +113,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B3AA00042D928007003E8625 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -76,6 +127,7 @@
 			isa = PBXGroup;
 			children = (
 				B34A73C32D1FA032003E8625 /* Averaged */,
+				B3AA00012D928005003E8625 /* ScreenTimeReport */,
 				B34A73D42D1FA034003E8625 /* AveragedTests */,
 				B34A73DE2D1FA034003E8625 /* AveragedUITests */,
 				B34A73C22D1FA032003E8625 /* Products */,
@@ -86,6 +138,7 @@
 			isa = PBXGroup;
 			children = (
 				B34A73C12D1FA032003E8625 /* Averaged.app */,
+				B3AA00022D928002003E8625 /* ScreenTimeReport.appex */,
 				B34A73D12D1FA034003E8625 /* AveragedTests.xctest */,
 				B34A73DB2D1FA034003E8625 /* AveragedUITests.xctest */,
 			);
@@ -102,10 +155,12 @@
 				B34A73BD2D1FA032003E8625 /* Sources */,
 				B34A73BE2D1FA032003E8625 /* Frameworks */,
 				B34A73BF2D1FA032003E8625 /* Resources */,
+				B3AA000C2D928004003E8625 /* Embed Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				B3AA000B2D928008003E8625 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				B34A73C32D1FA032003E8625 /* Averaged */,
@@ -163,6 +218,28 @@
 			productReference = B34A73DB2D1FA034003E8625 /* AveragedUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		B3AA00062D928006003E8625 /* ScreenTimeReport */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B3AA00092D928009003E8625 /* Build configuration list for PBXNativeTarget "ScreenTimeReport" */;
+			buildPhases = (
+				B3AA00032D92800A003E8625 /* Sources */,
+				B3AA00042D928007003E8625 /* Frameworks */,
+				B3AA00052D92800B003E8625 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B3AA00012D928005003E8625 /* ScreenTimeReport */,
+			);
+			name = ScreenTimeReport;
+			packageProductDependencies = (
+			);
+			productName = ScreenTimeReport;
+			productReference = B3AA00022D928002003E8625 /* ScreenTimeReport.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -184,6 +261,9 @@
 						CreatedOnToolsVersion = 16.2;
 						TestTargetID = B34A73C02D1FA032003E8625;
 					};
+					B3AA00062D928006003E8625 = {
+						CreatedOnToolsVersion = 16.2;
+					};
 				};
 			};
 			buildConfigurationList = B34A73BC2D1FA032003E8625 /* Build configuration list for PBXProject "Averaged" */;
@@ -201,6 +281,7 @@
 			projectRoot = "";
 			targets = (
 				B34A73C02D1FA032003E8625 /* Averaged */,
+				B3AA00062D928006003E8625 /* ScreenTimeReport */,
 				B34A73D02D1FA034003E8625 /* AveragedTests */,
 				B34A73DA2D1FA034003E8625 /* AveragedUITests */,
 			);
@@ -223,6 +304,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B34A73D92D1FA034003E8625 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B3AA00052D92800B003E8625 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -253,6 +341,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B3AA00032D92800A003E8625 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -265,6 +360,11 @@
 			isa = PBXTargetDependency;
 			target = B34A73C02D1FA032003E8625 /* Averaged */;
 			targetProxy = B34A73DC2D1FA034003E8625 /* PBXContainerItemProxy */;
+		};
+		B3AA000B2D928008003E8625 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B3AA00062D928006003E8625 /* ScreenTimeReport */;
+			targetProxy = B3AA000A2D928003003E8625 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -395,7 +495,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Averaged/Averaged.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_ASSET_PATHS = "\"Averaged/Preview Content\"";
 				DEVELOPMENT_TEAM = F2B95Q4CT8;
 				ENABLE_PREVIEWS = YES;
@@ -413,7 +513,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.conjfrnk.Averaged;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -429,7 +529,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Averaged/Averaged.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_ASSET_PATHS = "\"Averaged/Preview Content\"";
 				DEVELOPMENT_TEAM = F2B95Q4CT8;
 				ENABLE_PREVIEWS = YES;
@@ -447,7 +547,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.conjfrnk.Averaged;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -528,6 +628,60 @@
 			};
 			name = Release;
 		};
+		B3AA00072D92800C003E8625 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ScreenTimeReport/ScreenTimeReport.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = F2B95Q4CT8;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ScreenTimeReport/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ScreenTimeReport;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.conjfrnk.Averaged.ScreenTimeReport;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B3AA00082D92800D003E8625 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ScreenTimeReport/ScreenTimeReport.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = F2B95Q4CT8;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ScreenTimeReport/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ScreenTimeReport;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.conjfrnk.Averaged.ScreenTimeReport;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -563,6 +717,15 @@
 			buildConfigurations = (
 				B34A73EC2D1FA034003E8625 /* Debug */,
 				B34A73ED2D1FA034003E8625 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B3AA00092D928009003E8625 /* Build configuration list for PBXNativeTarget "ScreenTimeReport" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B3AA00072D92800C003E8625 /* Debug */,
+				B3AA00082D92800D003E8625 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

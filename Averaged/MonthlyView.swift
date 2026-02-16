@@ -10,7 +10,12 @@ import SwiftUI
 
 struct MonthlyView: View {
     @EnvironmentObject var healthDataManager: HealthDataManager
-    @StateObject private var screenTimeManager = ScreenTimeDataManager.shared
+    @ObservedObject private var screenTimeManager = ScreenTimeDataManager.shared
+    @State private var selectedMonth: Date = {
+        let cal = Calendar.current
+        let comps = cal.dateComponents([.year, .month], from: Date())
+        return cal.date(from: comps) ?? Date()
+    }()
     @State private var dailyWakeTimes: [DailyWakeData] = []
     @State private var dailyScreenTimes: [DailyScreenTimeData] = []
     @State private var goalWakeMinutes: Double = 360
@@ -19,6 +24,33 @@ struct MonthlyView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                HStack {
+                    Button {
+                        if let prev = Calendar.current.date(byAdding: .month, value: -1, to: selectedMonth) {
+                            selectedMonth = prev
+                            reloadMonthlyData()
+                            reloadMonthlyScreenTime()
+                        }
+                    } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                    Spacer()
+                    Text(monthYearString(selectedMonth))
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    Spacer()
+                    Button {
+                        if let next = Calendar.current.date(byAdding: .month, value: 1, to: selectedMonth) {
+                            selectedMonth = next
+                            reloadMonthlyData()
+                            reloadMonthlyScreenTime()
+                        }
+                    } label: {
+                        Image(systemName: "chevron.right")
+                    }
+                    .disabled(isCurrentMonth)
+                }
+                .padding(.horizontal)
                 Text("Wake Time")
                     .font(.headline)
                 if dailyWakeTimes.isEmpty {
@@ -53,7 +85,7 @@ struct MonthlyView: View {
                             .foregroundStyle(.green.opacity(0.8))
                     }
                     .chartYScale(
-                        domain: yDomain(
+                        domain: chartYDomain(
                             for: dailyWakeTimes.map(\.wakeMinutes),
                             goal: goalWakeMinutes)
                     )
@@ -70,9 +102,13 @@ struct MonthlyView: View {
                     }
                     .chartXScale(domain: monthlyXDomain())
                     .chartXAxis {
-                        AxisMarks(values: .stride(by: .day)) {
+                        AxisMarks(values: .stride(by: .day, count: 5)) { value in
                             AxisGridLine()
-                            AxisValueLabel { Text("") }
+                            AxisValueLabel {
+                                if let date = value.as(Date.self) {
+                                    Text("\(Calendar.current.component(.day, from: date))")
+                                }
+                            }
                         }
                     }
                     .frame(height: 300)
@@ -128,7 +164,7 @@ struct MonthlyView: View {
                             .foregroundStyle(.green.opacity(0.8))
                     }
                     .chartYScale(
-                        domain: yDomain(
+                        domain: chartYDomain(
                             for: dailyScreenTimes.map(\.minutes),
                             goal: Double(screenTimeGoal))
                     )
@@ -145,9 +181,13 @@ struct MonthlyView: View {
                     }
                     .chartXScale(domain: monthlyXDomain())
                     .chartXAxis {
-                        AxisMarks(values: .stride(by: .day)) {
+                        AxisMarks(values: .stride(by: .day, count: 5)) { value in
                             AxisGridLine()
-                            AxisValueLabel { Text("") }
+                            AxisValueLabel {
+                                if let date = value.as(Date.self) {
+                                    Text("\(Calendar.current.component(.day, from: date))")
+                                }
+                            }
                         }
                     }
                     .frame(height: 300)
@@ -205,8 +245,8 @@ struct MonthlyView: View {
     }
 
     func reloadMonthlyData() {
-        let start = startOfCurrentMonth()
-        let end = endOfCurrentMonth()
+        let start = startOfMonth()
+        let end = endOfMonth()
         let items = healthDataManager.allWakeData.filter {
             guard let w = $0.wakeTime else { return false }
             return w >= start && w <= end
@@ -228,9 +268,9 @@ struct MonthlyView: View {
     }
 
     func reloadMonthlyScreenTime() {
-        let start = startOfCurrentMonth()
-        let end = endOfCurrentMonth()
-        let records = screenTimeManager.allScreenTimeData.filter { record in
+        let start = startOfMonth()
+        let end = endOfMonth()
+        let records = screenTimeManager.validScreenTimeData.filter { record in
             guard let d = record.date else { return false }
             return d >= start && d <= end
         }
@@ -244,67 +284,36 @@ struct MonthlyView: View {
         }
     }
 
-    func computeAverage(_ values: [Double]) -> Double? {
-        guard !values.isEmpty else { return nil }
-        let sum = values.reduce(0, +)
-        let avg = sum / Double(values.count)
-        if avg.isNaN || avg.isInfinite {
-            return nil
-        }
-        return avg
+    func startOfMonth() -> Date {
+        return selectedMonth
     }
 
-    func startOfCurrentMonth() -> Date {
+    func endOfMonth() -> Date {
         let cal = Calendar.current
-        let now = Date()
-        let comps = cal.dateComponents([.year, .month], from: now)
-        return cal.date(from: comps) ?? now
-    }
-
-    func endOfCurrentMonth() -> Date {
-        let cal = Calendar.current
-        let s = startOfCurrentMonth()
-        guard let range = cal.range(of: .day, in: .month, for: s) else {
-            return s
-        }
-        return cal.date(bySetting: .day, value: range.upperBound - 1, of: s)
-            ?? s
+        guard let range = cal.range(of: .day, in: .month, for: selectedMonth) else { return selectedMonth }
+        return cal.date(bySetting: .day, value: range.upperBound - 1, of: selectedMonth) ?? selectedMonth
     }
 
     func monthlyXDomain() -> ClosedRange<Date> {
         let cal = Calendar.current
-        let now = Date()
-        let comps = cal.dateComponents([.year, .month], from: now)
-        guard let startOfMonth = cal.date(from: comps),
-            let range = cal.range(of: .day, in: .month, for: startOfMonth),
-            let first = cal.date(
-                bySetting: .day, value: range.lowerBound, of: startOfMonth),
-            let last = cal.date(
-                bySetting: .day, value: range.upperBound - 1, of: startOfMonth)
-        else {
-            return now...now
-        }
+        guard let range = cal.range(of: .day, in: .month, for: selectedMonth),
+              let first = cal.date(bySetting: .day, value: range.lowerBound, of: selectedMonth),
+              let last = cal.date(bySetting: .day, value: range.upperBound - 1, of: selectedMonth)
+        else { return selectedMonth...selectedMonth }
         return first...last
     }
 
-    func yDomain(for values: [Double], goal: Double) -> ClosedRange<Double> {
-        let allVals = values + [goal]
-        if allVals.isEmpty {
-            return 0...0
-        }
-        let minVal = allVals.min() ?? 0
-        let maxVal = allVals.max() ?? 1440
-        let minFloor = Double(Int(minVal / 30) * 30) - 30
-        let maxCeil = Double(Int(maxVal / 30) * 30) + 30
-        let lower = max(0, minFloor)
-        let upper = min(1440, maxCeil)
-        return lower...upper
+    private func monthYearString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter.string(from: date)
     }
 
-    func minutesToHHmm(_ val: Double) -> String {
-        let h = Int(val / 60)
-        let m = Int(val) % 60
-        return String(format: "%02d:%02d", h, m)
+    private var isCurrentMonth: Bool {
+        let cal = Calendar.current
+        let now = Date()
+        return cal.component(.year, from: selectedMonth) == cal.component(.year, from: now)
+            && cal.component(.month, from: selectedMonth) == cal.component(.month, from: now)
     }
 }
 

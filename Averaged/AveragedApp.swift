@@ -10,11 +10,18 @@ import SwiftUI
 @main
 struct AveragedApp: App {
     @StateObject private var healthDataManager = HealthDataManager()
+    @StateObject private var autoScreenTime = AutoScreenTimeManager.shared
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(healthDataManager)
+                .environmentObject(autoScreenTime)
+                .task {
+                    if !autoScreenTime.isAuthorized {
+                        await autoScreenTime.requestAuthorization()
+                    }
+                }
         }
     }
 }

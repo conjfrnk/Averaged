@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct InfoView: View {
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) var dismiss
 
     // Retrieve the build version and version number
     private var appVersion: String {
@@ -79,7 +79,7 @@ struct InfoView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: {
-                        presentationMode.wrappedValue.dismiss()
+                        dismiss()
                     }) {
                         Image(systemName: "xmark")
                             .foregroundColor(.blue)

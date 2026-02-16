@@ -15,6 +15,7 @@ public class HealthDataManager: ObservableObject {
     private let sleepType = HKObjectType.categoryType(
         forIdentifier: .sleepAnalysis)!
     private let dayBoundaryHour = 14
+    private let resultsQueue = DispatchQueue(label: "com.conjfrnk.averaged.results")
 
     public struct WakeData: Identifiable {
         public let id = UUID()
@@ -57,9 +58,9 @@ public class HealthDataManager: ObservableObject {
                 group.leave()
                 continue
             }
-            fetchWakeTime(for: targetDay) { wake in
+            fetchWakeTime(for: targetDay) { [weak self] wake in
                 let w = WakeData(date: targetDay, wakeTime: wake)
-                results.append(w)
+                self?.resultsQueue.sync { results.append(w) }
                 group.leave()
             }
         }

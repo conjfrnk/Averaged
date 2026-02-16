@@ -10,7 +10,8 @@ import SwiftUI
 
 struct YearlyView: View {
     @EnvironmentObject var healthDataManager: HealthDataManager
-    @StateObject private var screenTimeManager = ScreenTimeDataManager.shared
+    @ObservedObject private var screenTimeManager = ScreenTimeDataManager.shared
+    @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
     @State private var monthlyWakeTimes: [MonthlyWakeData] = []
     @State private var monthlyScreenTimes: [MonthlyScreenTimeData] = []
     @State private var goalWakeMinutes: Double = 360
@@ -19,6 +20,29 @@ struct YearlyView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                HStack {
+                    Button {
+                        selectedYear -= 1
+                        reloadMonthlyData()
+                        reloadMonthlyScreenTime()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                    Spacer()
+                    Text(String(selectedYear))
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    Spacer()
+                    Button {
+                        selectedYear += 1
+                        reloadMonthlyData()
+                        reloadMonthlyScreenTime()
+                    } label: {
+                        Image(systemName: "chevron.right")
+                    }
+                    .disabled(selectedYear >= Calendar.current.component(.year, from: Date()))
+                }
+                .padding(.horizontal)
                 Text("Wake Time")
                     .font(.headline)
                 if monthlyWakeTimes.isEmpty {
@@ -27,7 +51,7 @@ struct YearlyView: View {
                         .frame(height: 200)
                 } else {
                     Chart {
-                        if let yearlyAvg = computeAverageWakeTime() {
+                        if let yearlyAvg = computeAverage(monthlyWakeTimes.map { $0.wakeMinutes }) {
                             RuleMark(y: .value("Yearly Average", yearlyAvg))
                                 .lineStyle(.init(lineWidth: 2, dash: [5]))
                                 .foregroundStyle(.blue.opacity(0.8))
@@ -51,7 +75,7 @@ struct YearlyView: View {
                             .foregroundStyle(.green.opacity(0.8))
                     }
                     .chartYScale(
-                        domain: yearlyYDomain(
+                        domain: chartYDomain(
                             for: monthlyWakeTimes.map { $0.wakeMinutes },
                             goal: goalWakeMinutes)
                     )
@@ -79,7 +103,7 @@ struct YearlyView: View {
                     }
                     .frame(height: 200)
                 }
-                if let avg = computeAverageWakeTime(), !monthlyWakeTimes.isEmpty
+                if let avg = computeAverage(monthlyWakeTimes.map { $0.wakeMinutes }), !monthlyWakeTimes.isEmpty
                 {
                     let txt = minutesToHHmm(avg)
                     HStack {
@@ -104,7 +128,7 @@ struct YearlyView: View {
                         .frame(height: 200)
                 } else {
                     Chart {
-                        if let yearlyAvg = computeAverageScreenTime() {
+                        if let yearlyAvg = computeAverage(monthlyScreenTimes.map { $0.minutes }) {
                             RuleMark(y: .value("Yearly Average", yearlyAvg))
                                 .lineStyle(.init(lineWidth: 2, dash: [5]))
                                 .foregroundStyle(.blue.opacity(0.8))
@@ -127,7 +151,7 @@ struct YearlyView: View {
                             .foregroundStyle(.green.opacity(0.8))
                     }
                     .chartYScale(
-                        domain: yearlyYDomain(
+                        domain: chartYDomain(
                             for: monthlyScreenTimes.map { $0.minutes },
                             goal: Double(screenTimeGoal))
                     )
@@ -155,7 +179,7 @@ struct YearlyView: View {
                     }
                     .frame(height: 200)
                 }
-                if let avg2 = computeAverageScreenTime(),
+                if let avg2 = computeAverage(monthlyScreenTimes.map { $0.minutes }),
                     !monthlyScreenTimes.isEmpty
                 {
                     let txt2 = minutesToHHmm(avg2)
@@ -177,13 +201,7 @@ struct YearlyView: View {
         }
         .onAppear {
             healthDataManager.requestAuthorization { _, _ in }
-            if healthDataManager.allWakeData.isEmpty {
-                healthDataManager.fetchWakeTimesOverLastNDays(365) {
-                    reloadMonthlyData()
-                }
-            } else {
-                reloadMonthlyData()
-            }
+            reloadMonthlyData()
             reloadMonthlyScreenTime()
             loadUserGoal()
         }
@@ -209,8 +227,7 @@ struct YearlyView: View {
 
     func reloadMonthlyData() {
         let calendar = Calendar.current
-        let now = Date()
-        let year = calendar.component(.year, from: now)
+        let year = selectedYear
         guard
             let jan1 = calendar.date(
                 from: DateComponents(year: year, month: 1, day: 1)),
@@ -220,6 +237,23 @@ struct YearlyView: View {
             monthlyWakeTimes = []
             return
         }
+        let daysSinceJan1 = max(
+            365,
+            Int(Date().timeIntervalSince(jan1) / 86400) + 1)
+        if healthDataManager.allWakeData.isEmpty {
+            healthDataManager.fetchWakeTimesOverLastNDays(daysSinceJan1) {
+                self.processMonthlyWakeData(
+                    calendar: calendar, year: year, jan1: jan1, jan1n: jan1n)
+            }
+        } else {
+            processMonthlyWakeData(
+                calendar: calendar, year: year, jan1: jan1, jan1n: jan1n)
+        }
+    }
+
+    private func processMonthlyWakeData(
+        calendar: Calendar, year: Int, jan1: Date, jan1n: Date
+    ) {
         let filtered = healthDataManager.allWakeData.filter {
             guard let w = $0.wakeTime else { return false }
             return w >= jan1 && w < jan1n
@@ -255,8 +289,7 @@ struct YearlyView: View {
 
     func reloadMonthlyScreenTime() {
         let calendar = Calendar.current
-        let now = Date()
-        let year = calendar.component(.year, from: now)
+        let year = selectedYear
         guard
             let jan1 = calendar.date(
                 from: DateComponents(year: year, month: 1, day: 1)),
@@ -266,7 +299,7 @@ struct YearlyView: View {
             monthlyScreenTimes = []
             return
         }
-        let filtered = screenTimeManager.allScreenTimeData.filter {
+        let filtered = screenTimeManager.validScreenTimeData.filter {
             guard let d = $0.date else { return false }
             return d >= jan1 && d < jan1n
         }
@@ -297,75 +330,13 @@ struct YearlyView: View {
         monthlyScreenTimes = temp.sorted { $0.date < $1.date }
     }
 
-    func computeAverageWakeTime() -> Double? {
-        guard !monthlyWakeTimes.isEmpty else { return nil }
-        let sum = monthlyWakeTimes.reduce(0.0) { $0 + $1.wakeMinutes }
-        let avg = sum / Double(monthlyWakeTimes.count)
-        if avg.isNaN || avg.isInfinite {
-            return nil
-        }
-        return avg
-    }
-
-    func computeAverageScreenTime() -> Double? {
-        guard !monthlyScreenTimes.isEmpty else { return nil }
-        let sum = monthlyScreenTimes.reduce(0.0) { $0 + $1.minutes }
-        let avg = sum / Double(monthlyScreenTimes.count)
-        if avg.isNaN || avg.isInfinite {
-            return nil
-        }
-        return avg
-    }
-
     func currentYearDomain() -> ClosedRange<Date> {
         let calendar = Calendar.current
-        let year = calendar.component(.year, from: Date())
         let jan1 = calendar.date(
-            from: DateComponents(year: year, month: 1, day: 1))!
+            from: DateComponents(year: selectedYear, month: 1, day: 1))!
         let dec31 = calendar.date(
-            from: DateComponents(year: year, month: 12, day: 31))!
+            from: DateComponents(year: selectedYear, month: 12, day: 31))!
         return jan1...dec31
-    }
-
-    func yearlyYDomain(for values: [Double], goal: Double) -> ClosedRange<
-        Double
-    > {
-        let allVals = values + [goal]
-        if allVals.isEmpty {
-            return 0...0
-        }
-        let minVal = allVals.min() ?? 0
-        let maxVal = allVals.max() ?? 1440
-        let minFloor = Double(Int(minVal / 30) * 30) - 30
-        let maxCeil = Double(Int(maxVal / 30) * 30) + 30
-        let lower = max(0, minFloor)
-        let upper = min(1440, maxCeil)
-        return lower...upper
-    }
-
-    func singleLetterMonth(_ date: Date) -> String {
-        let month = Calendar.current.component(.month, from: date)
-        switch month {
-        case 1: return "J"
-        case 2: return "F"
-        case 3: return "M"
-        case 4: return "A"
-        case 5: return "M"
-        case 6: return "J"
-        case 7: return "J"
-        case 8: return "A"
-        case 9: return "S"
-        case 10: return "O"
-        case 11: return "N"
-        case 12: return "D"
-        default: return ""
-        }
-    }
-
-    func minutesToHHmm(_ val: Double) -> String {
-        let h = Int(val / 60)
-        let m = Int(val) % 60
-        return String(format: "%02d:%02d", h, m)
     }
 }
 

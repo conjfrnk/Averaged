@@ -12,7 +12,7 @@ extension Notification.Name {
 }
 
 struct SettingsView: View {
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) var dismiss
     static var didChangeGoalTime = false
 
     @State private var selectedWakeTime: Date = {
@@ -179,7 +179,7 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
-                        presentationMode.wrappedValue.dismiss()
+                        dismiss()
                     } label: {
                         Image(systemName: "xmark")
                             .foregroundColor(.blue)

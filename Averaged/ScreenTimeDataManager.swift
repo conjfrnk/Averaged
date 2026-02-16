@@ -13,6 +13,10 @@ class ScreenTimeDataManager: ObservableObject {
     let container: NSPersistentContainer
     @Published var allScreenTimeData: [ScreenTimeRecord] = []
 
+    var validScreenTimeData: [ScreenTimeRecord] {
+        allScreenTimeData.filter { $0.minutes >= 0 }
+    }
+
     private init() {
         container = NSPersistentContainer(name: "ScreenTimeModel")
         container.loadPersistentStores { _, _ in }
