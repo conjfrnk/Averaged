@@ -8,16 +8,14 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-extension Notification.Name {
-    static let didChangeGoalTime = Notification.Name("didChangeGoalTime")
-}
-
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var healthDataManager: HealthDataManager
-    static var didChangeGoalTime = false
     @State private var exportFileURL: URL?
     @State private var showShareSheet = false
+    @State private var showExportSuccess = false
+    @State private var showExportError = false
+    @State private var exportErrorMessage = ""
 
     @State private var selectedWakeTime: Date = {
         let calendar = Calendar.current
@@ -48,7 +46,7 @@ struct SettingsView: View {
 
     private let screenTimeOptions: [Int] = {
         var arr: [Int] = []
-        for min in stride(from: 0, through: 1440, by: 15) {
+        for min in stride(from: 15, through: 1440, by: 15) {
             arr.append(min)
         }
         return arr
@@ -206,12 +204,15 @@ struct SettingsView: View {
                 initializeWakeSettings()
                 initializeScreenTimeSettings()
             }
-            .onDisappear {
-                if Self.didChangeGoalTime {
-                    NotificationCenter.default.post(
-                        name: .didChangeGoalTime, object: nil)
-                    Self.didChangeGoalTime = false
-                }
+            .alert("Export Successful", isPresented: $showExportSuccess) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Your data has been exported successfully.")
+            }
+            .alert("Export Failed", isPresented: $showExportError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(exportErrorMessage)
             }
         }
     }
@@ -221,7 +222,9 @@ struct SettingsView: View {
             selectedWakeTime = wakeTimeOptions[index]
             UserDefaults.standard.set(
                 selectedWakeTime.timeIntervalSince1970, forKey: "goalWakeTime")
-            Self.didChangeGoalTime = true
+            NotificationCenter.default.post(
+                name: .didChangeGoalTime, object: nil)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
         withAnimation(.easeOut) {
             let targetOffset = -CGFloat(index) * totalItemWidth
@@ -235,7 +238,9 @@ struct SettingsView: View {
             let val = screenTimeOptions[index]
             selectedScreenTimeGoal = val
             UserDefaults.standard.set(val, forKey: "screenTimeGoal")
-            Self.didChangeGoalTime = true
+            NotificationCenter.default.post(
+                name: .didChangeGoalTime, object: nil)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
         withAnimation(.easeOut) {
             let targetOffset = -CGFloat(index) * totalItemWidth
@@ -264,7 +269,9 @@ struct SettingsView: View {
                     UserDefaults.standard.set(
                         selectedWakeTime.timeIntervalSince1970,
                         forKey: "goalWakeTime")
-                    Self.didChangeGoalTime = true
+                    NotificationCenter.default.post(
+                        name: .didChangeGoalTime, object: nil)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
                 withAnimation(.interpolatingSpring(stiffness: 100, damping: 15))
                 {
@@ -296,7 +303,9 @@ struct SettingsView: View {
                     let val = screenTimeOptions[centerIndex]
                     selectedScreenTimeGoal = val
                     UserDefaults.standard.set(val, forKey: "screenTimeGoal")
-                    Self.didChangeGoalTime = true
+                    NotificationCenter.default.post(
+                        name: .didChangeGoalTime, object: nil)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
                 withAnimation(.interpolatingSpring(stiffness: 100, damping: 15))
                 {
@@ -451,8 +460,10 @@ struct SettingsView: View {
             try csv.write(to: tempURL, atomically: true, encoding: .utf8)
             exportFileURL = tempURL
             showShareSheet = true
+            showExportSuccess = true
         } catch {
-            print("Failed to write CSV: \(error)")
+            exportErrorMessage = "Failed to write CSV: \(error.localizedDescription)"
+            showExportError = true
         }
     }
 }

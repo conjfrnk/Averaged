@@ -113,6 +113,8 @@ struct YearlyView: View {
                         }
                     }
                     .frame(height: 200)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(wakeTimeChartAccessibilityLabel)
                 }
                 if let avg = computeAverage(monthlyWakeTimes.map { $0.wakeMinutes }), !monthlyWakeTimes.isEmpty
                 {
@@ -190,6 +192,8 @@ struct YearlyView: View {
                         }
                     }
                     .frame(height: 200)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(screenTimeChartAccessibilityLabel)
                 }
                 if let avg2 = computeAverage(monthlyScreenTimes.map { $0.minutes }),
                     !monthlyScreenTimes.isEmpty
@@ -351,6 +355,22 @@ struct YearlyView: View {
         let dec31 = calendar.date(
             from: DateComponents(year: selectedYear, month: 12, day: 31))!
         return jan1...dec31
+    }
+
+    private var wakeTimeChartAccessibilityLabel: String {
+        if let avg = computeAverage(monthlyWakeTimes.map { $0.wakeMinutes }) {
+            return "Wake time chart showing average of \(minutesToHHmm(avg)) this year"
+        }
+        return "Wake time chart with no data"
+    }
+
+    private var screenTimeChartAccessibilityLabel: String {
+        if let avg = computeAverage(monthlyScreenTimes.map { $0.minutes }) {
+            let hours = Int(avg) / 60
+            let minutes = Int(avg) % 60
+            return "Screen time chart showing average of \(hours) hours \(minutes) minutes this year"
+        }
+        return "Screen time chart with no data"
     }
 }
 

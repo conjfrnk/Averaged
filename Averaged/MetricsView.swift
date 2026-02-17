@@ -115,6 +115,11 @@ struct MetricsView: View {
                 healthDataManager.fetchWakeTimesOverLastNDays(365) {}
             }
         }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .didChangeGoalTime)
+        ) { _ in
+            loadGoal()
+        }
     }
 
     private func loadGoal() {

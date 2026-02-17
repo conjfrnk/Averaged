@@ -155,8 +155,9 @@ struct ScreenTimeDetailView: View {
             let jan1 = cal.date(
                 from: DateComponents(year: year, month: 1, day: 1))
         else { return nil }
+        let todayStart = cal.startOfDay(for: now)
         var day = jan1
-        while day <= now {
+        while day < todayStart {
             if !manager.isSkippedDay(day), manager.fetchRecord(for: day) == nil
             {
                 return day

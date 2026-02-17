@@ -9,6 +9,13 @@ import Foundation
 
 /// Shared chart helper functions used across views
 
+enum ChartConstants {
+    static let minutesInDay = 1440
+    static let defaultStride = 30
+    static let wakeTimeStride = 30
+    static let screenTimeStride = 60
+}
+
 func wakeTimeInMinutes(_ date: Date) -> Double {
     let comps = Calendar.current.dateComponents([.hour, .minute], from: date)
     return Double((comps.hour ?? 0) * 60 + (comps.minute ?? 0))
@@ -25,12 +32,13 @@ func chartYDomain(for values: [Double], goal: Double) -> ClosedRange<Double> {
     if allVals.isEmpty {
         return 0...0
     }
+    let stride = Double(ChartConstants.defaultStride)
     let minVal = allVals.min() ?? 0
-    let maxVal = allVals.max() ?? 1440
-    let minFloor = Double(Int(minVal / 30) * 30) - 30
-    let maxCeil = Double(Int(maxVal / 30) * 30) + 30
+    let maxVal = allVals.max() ?? Double(ChartConstants.minutesInDay)
+    let minFloor = Double(Int(minVal / stride) * ChartConstants.defaultStride) - stride
+    let maxCeil = Double(Int(maxVal / stride) * ChartConstants.defaultStride) + stride
     let lower = max(0, minFloor)
-    let upper = min(1440, maxCeil)
+    let upper = min(Double(ChartConstants.minutesInDay), maxCeil)
     return lower...upper
 }
 

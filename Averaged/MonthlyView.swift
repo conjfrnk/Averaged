@@ -123,6 +123,8 @@ struct MonthlyView: View {
                         }
                     }
                     .frame(height: 300)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(wakeTimeChartAccessibilityLabel)
                 }
                 if let avg = computeAverage(dailyWakeTimes.map(\.wakeMinutes)),
                     !dailyWakeTimes.isEmpty
@@ -203,6 +205,8 @@ struct MonthlyView: View {
                         }
                     }
                     .frame(height: 300)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(screenTimeChartAccessibilityLabel)
                 }
                 if let avg2 = computeAverage(dailyScreenTimes.map(\.minutes)),
                     !dailyScreenTimes.isEmpty
@@ -334,6 +338,22 @@ struct MonthlyView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMMM"
         return formatter.string(from: date)
+    }
+
+    private var wakeTimeChartAccessibilityLabel: String {
+        if let avg = computeAverage(dailyWakeTimes.map(\.wakeMinutes)) {
+            return "Wake time chart showing average of \(minutesToHHmm(avg)) this month"
+        }
+        return "Wake time chart with no data"
+    }
+
+    private var screenTimeChartAccessibilityLabel: String {
+        if let avg = computeAverage(dailyScreenTimes.map(\.minutes)) {
+            let hours = Int(avg) / 60
+            let minutes = Int(avg) % 60
+            return "Screen time chart showing average of \(hours) hours \(minutes) minutes this month"
+        }
+        return "Screen time chart with no data"
     }
 }
 

@@ -13,6 +13,7 @@ public class HealthDataManager: ObservableObject {
     @Published public var allWakeData: [WakeData] = []
     @Published public var authorizationStatus: HKAuthorizationStatus?
     @Published public var authorizationRequested: Bool = false
+    @Published public var authorizationError: Error?
     private let healthStore = HKHealthStore()
     private let sleepType = HKObjectType.categoryType(
         forIdentifier: .sleepAnalysis)!
@@ -39,6 +40,9 @@ public class HealthDataManager: ObservableObject {
                 self.authorizationStatus = self.healthStore.authorizationStatus(for: self.sleepType)
                 if success {
                     self.authorizationRequested = true
+                    self.authorizationError = nil
+                } else {
+                    self.authorizationError = error
                 }
                 completion(success, error)
             }
@@ -86,14 +90,16 @@ public class HealthDataManager: ObservableObject {
     ) {
         let calendar = Calendar.current
         let prevDay = calendar.date(byAdding: .day, value: -1, to: date) ?? date
-        let startTime =
-            calendar.date(
-                bySettingHour: dayBoundaryHour, minute: 0, second: 0,
-                of: prevDay) ?? prevDay
-        let endTime =
-            calendar.date(
-                bySettingHour: dayBoundaryHour, minute: 0, second: 0, of: date)
-            ?? date
+        var startComps = calendar.dateComponents([.year, .month, .day], from: prevDay)
+        startComps.hour = dayBoundaryHour
+        startComps.minute = 0
+        startComps.second = 0
+        let startTime = calendar.date(from: startComps) ?? prevDay
+        var endComps = calendar.dateComponents([.year, .month, .day], from: date)
+        endComps.hour = dayBoundaryHour
+        endComps.minute = 0
+        endComps.second = 0
+        let endTime = calendar.date(from: endComps) ?? date
         let pred = HKQuery.predicateForSamples(
             withStart: startTime, end: endTime, options: .strictStartDate)
         let sortDescs = [

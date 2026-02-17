@@ -8,6 +8,7 @@
 import FamilyControls
 import Foundation
 import SwiftUI
+import Combine
 
 class AutoScreenTimeManager: ObservableObject {
     static let shared = AutoScreenTimeManager()
@@ -16,9 +17,37 @@ class AutoScreenTimeManager: ObservableObject {
     @Published var isAuthorized = false
     @Published var todayMinutes: Double?
 
+    private var refreshTimer: Timer?
+    private var foregroundCancellable: AnyCancellable?
+
     private init() {
         checkAuthorization()
         loadTodayData()
+        startPeriodicRefresh()
+        observeForeground()
+    }
+
+    deinit {
+        refreshTimer?.invalidate()
+        foregroundCancellable?.cancel()
+    }
+
+    private func startPeriodicRefresh() {
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.loadTodayData()
+            }
+        }
+    }
+
+    private func observeForeground() {
+        foregroundCancellable = NotificationCenter.default
+            .publisher(for: UIApplication.willEnterForegroundNotification)
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.loadTodayData()
+                }
+            }
     }
 
     func requestAuthorization() async {
