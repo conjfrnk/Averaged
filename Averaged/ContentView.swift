@@ -8,11 +8,16 @@
 import SwiftUI
 
 struct ContentView: View {
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding =
+        false
     @State private var selectedTab = 0
     @State private var showInfo = false
     @State private var showSettings = false
 
     var body: some View {
+        if !hasCompletedOnboarding {
+            OnboardingView()
+        } else {
         NavigationStack {
             ZStack {
                 TabView(selection: $selectedTab) {
@@ -55,6 +60,7 @@ struct ContentView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
             }
+        }
         }
     }
 }

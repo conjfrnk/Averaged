@@ -11,11 +11,17 @@ import SwiftUI
 
 public class HealthDataManager: ObservableObject {
     @Published public var allWakeData: [WakeData] = []
+    @Published public var authorizationStatus: HKAuthorizationStatus?
+    @Published public var authorizationRequested: Bool = false
     private let healthStore = HKHealthStore()
     private let sleepType = HKObjectType.categoryType(
         forIdentifier: .sleepAnalysis)!
     private let dayBoundaryHour = 14
     private let resultsQueue = DispatchQueue(label: "com.conjfrnk.averaged.results")
+
+    public var isAuthorized: Bool {
+        authorizationRequested
+    }
 
     public struct WakeData: Identifiable {
         public let id = UUID()
@@ -30,6 +36,10 @@ public class HealthDataManager: ObservableObject {
         healthStore.requestAuthorization(toShare: nil, read: toRead) {
             success, error in
             DispatchQueue.main.async {
+                self.authorizationStatus = self.healthStore.authorizationStatus(for: self.sleepType)
+                if success {
+                    self.authorizationRequested = true
+                }
                 completion(success, error)
             }
         }

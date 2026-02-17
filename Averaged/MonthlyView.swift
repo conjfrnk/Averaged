@@ -19,6 +19,7 @@ struct MonthlyView: View {
     @State private var dailyWakeTimes: [DailyWakeData] = []
     @State private var dailyScreenTimes: [DailyScreenTimeData] = []
     @State private var goalWakeMinutes: Double = 360
+    @State private var isLoading = false
     @AppStorage("screenTimeGoal") private var screenTimeGoal: Int = 120
 
     var body: some View {
@@ -53,10 +54,20 @@ struct MonthlyView: View {
                 .padding(.horizontal)
                 Text("Wake Time")
                     .font(.headline)
-                if dailyWakeTimes.isEmpty {
-                    Text("No data for this month")
-                        .foregroundColor(.secondary)
+                if isLoading {
+                    ProgressView("Loading wake data...")
                         .frame(height: 300)
+                } else if dailyWakeTimes.isEmpty {
+                    if healthDataManager.allWakeData.isEmpty {
+                        Text("No wake data available.\nMake sure Health access is enabled in Settings.")
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .frame(height: 300)
+                    } else {
+                        Text("No wake data for \(monthNameString(selectedMonth)).")
+                            .foregroundColor(.secondary)
+                            .frame(height: 300)
+                    }
                 } else {
                     Chart {
                         if let avg = computeAverage(
@@ -134,8 +145,9 @@ struct MonthlyView: View {
                 Text("Screen Time")
                     .font(.headline)
                 if dailyScreenTimes.isEmpty {
-                    Text("No Screen Time data for this month")
+                    Text("No screen time logged for \(monthNameString(selectedMonth)).\nTap Metrics \u{2192} Log Screen Time to add entries.")
                         .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
                         .frame(height: 300)
                 } else {
                     Chart {
@@ -215,8 +227,10 @@ struct MonthlyView: View {
         .onAppear {
             healthDataManager.requestAuthorization { _, _ in }
             if healthDataManager.allWakeData.isEmpty {
+                isLoading = true
                 healthDataManager.fetchWakeTimesOverLastNDays(60) {
                     reloadMonthlyData()
+                    isLoading = false
                 }
             } else {
                 reloadMonthlyData()
@@ -314,6 +328,12 @@ struct MonthlyView: View {
         let now = Date()
         return cal.component(.year, from: selectedMonth) == cal.component(.year, from: now)
             && cal.component(.month, from: selectedMonth) == cal.component(.month, from: now)
+    }
+
+    private func monthNameString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM"
+        return formatter.string(from: date)
     }
 }
 

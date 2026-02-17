@@ -83,6 +83,21 @@ struct ScreenTimeDetailView: View {
                 }
                 .buttonStyle(.bordered)
 
+                if existingRecordMinutes != nil {
+                    Button("Delete Entry", role: .destructive) {
+                        if let record = manager.fetchRecord(for: selectedDate) {
+                            manager.delete(record)
+                        }
+                        if let next = firstEmptyDayInCurrentYear() {
+                            selectedDate = next
+                            loadRecord(for: next)
+                        } else {
+                            dismiss()
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
+
                 Spacer()
             }
             .padding()
@@ -103,8 +118,11 @@ struct ScreenTimeDetailView: View {
     }
 
     private var actionText: String {
-        guard let minutes = existingRecordMinutes, minutes >= 0 else {
+        guard let minutes = existingRecordMinutes else {
             return "Select Time Spent"
+        }
+        if minutes < 0 {
+            return "Day was skipped — edit to add time"
         }
         let hr = minutes / 60
         let mn = minutes % 60

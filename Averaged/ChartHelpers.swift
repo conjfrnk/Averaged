@@ -8,6 +8,12 @@
 import Foundation
 
 /// Shared chart helper functions used across views
+
+func wakeTimeInMinutes(_ date: Date) -> Double {
+    let comps = Calendar.current.dateComponents([.hour, .minute], from: date)
+    return Double((comps.hour ?? 0) * 60 + (comps.minute ?? 0))
+}
+
 func minutesToHHmm(_ val: Double) -> String {
     let h = Int(val / 60)
     let m = Int(val) % 60

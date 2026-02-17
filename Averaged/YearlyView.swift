@@ -15,6 +15,7 @@ struct YearlyView: View {
     @State private var monthlyWakeTimes: [MonthlyWakeData] = []
     @State private var monthlyScreenTimes: [MonthlyScreenTimeData] = []
     @State private var goalWakeMinutes: Double = 360
+    @State private var isLoading = false
     @AppStorage("screenTimeGoal") private var screenTimeGoal: Int = 120
 
     var body: some View {
@@ -45,10 +46,20 @@ struct YearlyView: View {
                 .padding(.horizontal)
                 Text("Wake Time")
                     .font(.headline)
-                if monthlyWakeTimes.isEmpty {
-                    Text("No data for this year")
-                        .foregroundColor(.secondary)
+                if isLoading {
+                    ProgressView("Loading wake data...")
                         .frame(height: 200)
+                } else if monthlyWakeTimes.isEmpty {
+                    if healthDataManager.allWakeData.isEmpty {
+                        Text("No wake data available.\nMake sure Health access is enabled in Settings.")
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .frame(height: 200)
+                    } else {
+                        Text("No wake data for \(String(selectedYear)).")
+                            .foregroundColor(.secondary)
+                            .frame(height: 200)
+                    }
                 } else {
                     Chart {
                         if let yearlyAvg = computeAverage(monthlyWakeTimes.map { $0.wakeMinutes }) {
@@ -123,8 +134,9 @@ struct YearlyView: View {
                 Text("Screen Time")
                     .font(.headline)
                 if monthlyScreenTimes.isEmpty {
-                    Text("No data for this year")
+                    Text("No screen time logged for \(String(selectedYear)).\nTap Metrics \u{2192} Log Screen Time to add entries.")
                         .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
                         .frame(height: 200)
                 } else {
                     Chart {
@@ -241,9 +253,11 @@ struct YearlyView: View {
             365,
             Int(Date().timeIntervalSince(jan1) / 86400) + 1)
         if healthDataManager.allWakeData.isEmpty {
+            isLoading = true
             healthDataManager.fetchWakeTimesOverLastNDays(daysSinceJan1) {
                 self.processMonthlyWakeData(
                     calendar: calendar, year: year, jan1: jan1, jan1n: jan1n)
+                self.isLoading = false
             }
         } else {
             processMonthlyWakeData(

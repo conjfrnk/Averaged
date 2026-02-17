@@ -19,7 +19,11 @@ class ScreenTimeDataManager: ObservableObject {
 
     private init() {
         container = NSPersistentContainer(name: "ScreenTimeModel")
-        container.loadPersistentStores { _, _ in }
+        container.loadPersistentStores { _, error in
+            if let error = error {
+                print("CoreData: Failed to load persistent stores: \(error)")
+            }
+        }
         fetchAllScreenTime()
     }
 
@@ -79,7 +83,11 @@ class ScreenTimeDataManager: ObservableObject {
     }
 
     private func saveContext() {
-        try? container.viewContext.save()
+        do {
+            try container.viewContext.save()
+        } catch {
+            print("CoreData: Failed to save context: \(error)")
+        }
         fetchAllScreenTime()
     }
 }

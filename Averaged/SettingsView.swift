@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 extension Notification.Name {
     static let didChangeGoalTime = Notification.Name("didChangeGoalTime")
@@ -13,7 +14,10 @@ extension Notification.Name {
 
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var healthDataManager: HealthDataManager
     static var didChangeGoalTime = false
+    @State private var exportFileURL: URL?
+    @State private var showShareSheet = false
 
     @State private var selectedWakeTime: Date = {
         let calendar = Calendar.current
@@ -173,9 +177,21 @@ struct SettingsView: View {
                     .frame(height: 100)
                 }
 
+                Button {
+                    generateAndShareCSV()
+                } label: {
+                    Label("Export Data", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(.bordered)
+
                 Spacer()
             }
             .padding()
+            .sheet(isPresented: $showShareSheet) {
+                if let url = exportFileURL {
+                    ShareSheet(activityItems: [url])
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
@@ -382,4 +398,76 @@ struct SettingsView: View {
         let maxDistance = UIScreen.main.bounds.width / 2
         return Double(max(0.5, 1 - (distance / maxDistance)))
     }
+
+    private func generateAndShareCSV() {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "HH:mm"
+
+        var csv = "date,wake_time,screen_time_minutes\n"
+
+        let wakeData = healthDataManager.allWakeData
+        let screenData = ScreenTimeDataManager.shared.validScreenTimeData
+
+        let screenByDate: [String: Int] = {
+            var dict: [String: Int] = [:]
+            for record in screenData {
+                if let date = record.date {
+                    let key = dateFormatter.string(from: date)
+                    dict[key] = Int(record.minutes)
+                }
+            }
+            return dict
+        }()
+
+        var allDates = Set<String>()
+        for w in wakeData {
+            allDates.insert(dateFormatter.string(from: w.date))
+        }
+        for key in screenByDate.keys {
+            allDates.insert(key)
+        }
+
+        for dateStr in allDates.sorted() {
+            let wakeStr: String
+            if let w = wakeData.first(where: {
+                dateFormatter.string(from: $0.date) == dateStr
+            }),
+                let wt = w.wakeTime
+            {
+                wakeStr = timeFormatter.string(from: wt)
+            } else {
+                wakeStr = ""
+            }
+            let screenStr =
+                screenByDate[dateStr].map { String($0) } ?? ""
+            csv += "\(dateStr),\(wakeStr),\(screenStr)\n"
+        }
+
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("averaged_export.csv")
+        do {
+            try csv.write(to: tempURL, atomically: true, encoding: .utf8)
+            exportFileURL = tempURL
+            showShareSheet = true
+        } catch {
+            print("Failed to write CSV: \(error)")
+        }
+    }
+}
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context)
+        -> UIActivityViewController
+    {
+        UIActivityViewController(
+            activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(
+        _ uiViewController: UIActivityViewController, context: Context
+    ) {}
 }
