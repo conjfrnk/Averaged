@@ -14,6 +14,9 @@ struct MetricsView: View {
     @AppStorage("screenTimeGoal") private var screenTimeGoal: Int = 120
     @State private var showScreenTimeDetail = false
     @State private var goalWakeMinutes: Double = 360
+    @State private var showAuthError = false
+    @State private var cachedWakeLookup: [Date: Double] = [:]
+    @State private var cachedScreenLookup: [Date: Int] = [:]
 
     var body: some View {
         List {
@@ -44,7 +47,9 @@ struct MetricsView: View {
                         Image(systemName: avg <= goalWakeMinutes ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
                             .foregroundColor(avg <= goalWakeMinutes ? .green : .red)
                     } else {
-                        Text("N/A").foregroundColor(.secondary)
+                        Text("N/A")
+                            .foregroundColor(.secondary)
+                            .help("No wake data recorded this week")
                     }
                 }
                 HStack {
@@ -56,7 +61,9 @@ struct MetricsView: View {
                         Image(systemName: avg <= goalWakeMinutes ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
                             .foregroundColor(avg <= goalWakeMinutes ? .green : .red)
                     } else {
-                        Text("N/A").foregroundColor(.secondary)
+                        Text("N/A")
+                            .foregroundColor(.secondary)
+                            .help("No wake data recorded this month")
                     }
                 }
                 HStack {
@@ -77,7 +84,9 @@ struct MetricsView: View {
                         Image(systemName: avg <= Double(screenTimeGoal) ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
                             .foregroundColor(avg <= Double(screenTimeGoal) ? .green : .red)
                     } else {
-                        Text("N/A").foregroundColor(.secondary)
+                        Text("N/A")
+                            .foregroundColor(.secondary)
+                            .help("No screen time logged this week")
                     }
                 }
                 HStack {
@@ -89,8 +98,23 @@ struct MetricsView: View {
                         Image(systemName: avg <= Double(screenTimeGoal) ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
                             .foregroundColor(avg <= Double(screenTimeGoal) ? .green : .red)
                     } else {
-                        Text("N/A").foregroundColor(.secondary)
+                        Text("N/A")
+                            .foregroundColor(.secondary)
+                            .help("No screen time logged this month")
                     }
+                }
+                HStack {
+                    Label("Days Logged This Month", systemImage: "checkmark.circle")
+                    Spacer()
+                    Text("\(screenTimeDaysLoggedThisMonth)")
+                        .fontWeight(.semibold)
+                }
+                HStack {
+                    Label("Days Skipped This Month", systemImage: "xmark.circle")
+                    Spacer()
+                    Text("\(screenTimeDaysSkippedThisMonth)")
+                        .fontWeight(.semibold)
+                        .foregroundColor(screenTimeDaysSkippedThisMonth > 0 ? .orange : .secondary)
                 }
                 Button {
                     showScreenTimeDetail.toggle()
@@ -108,27 +132,60 @@ struct MetricsView: View {
         .sheet(isPresented: $showScreenTimeDetail) {
             ScreenTimeDetailView()
         }
+        .alert("Health Data Access", isPresented: $showAuthError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Unable to access Health data. Please enable access in Settings > Health > Data Access.")
+        }
         .onAppear {
-            loadGoal()
+            goalWakeMinutes = loadWakeTimeGoalMinutes()
             if healthDataManager.allWakeData.isEmpty {
                 healthDataManager.requestAuthorization { _, _ in }
-                healthDataManager.fetchWakeTimesOverLastNDays(365) {}
+                healthDataManager.fetchWakeTimesOverLastNDays(365) {
+                    rebuildLookups()
+                }
+            } else {
+                rebuildLookups()
+            }
+            if healthDataManager.authorizationError != nil {
+                showAuthError = true
             }
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .didChangeGoalTime)
         ) { _ in
-            loadGoal()
+            goalWakeMinutes = loadWakeTimeGoalMinutes()
+        }
+        .onChange(of: healthDataManager.allWakeData.count) { _ in
+            rebuildLookups()
+        }
+        .onChange(of: screenTimeManager.allScreenTimeData.count) { _ in
+            rebuildLookups()
         }
     }
 
-    private func loadGoal() {
-        let epoch = UserDefaults.standard.double(forKey: "goalWakeTime")
-        if epoch > 0 {
-            let date = Date(timeIntervalSince1970: epoch)
-            let comps = Calendar.current.dateComponents([.hour, .minute], from: date)
-            goalWakeMinutes = Double((comps.hour ?? 6) * 60 + (comps.minute ?? 0))
+    private func rebuildLookups() {
+        let calendar = Calendar.current
+        var wDict = [Date: Double]()
+        for data in healthDataManager.allWakeData {
+            guard let w = data.wakeTime else { continue }
+            let key = calendar.startOfDay(for: w)
+            let mins = wakeTimeInMinutes(w)
+            if let existing = wDict[key] {
+                wDict[key] = min(existing, mins)
+            } else {
+                wDict[key] = mins
+            }
         }
+        cachedWakeLookup = wDict
+
+        var sDict = [Date: Int]()
+        for record in validScreenTimeRecords {
+            guard let d = record.date else { continue }
+            let key = calendar.startOfDay(for: d)
+            sDict[key] = Int(record.minutes)
+        }
+        cachedScreenLookup = sDict
     }
 
     // MARK: - Wake Time Calculations
@@ -200,34 +257,31 @@ struct MetricsView: View {
         return values.reduce(0, +) / Double(values.count)
     }
 
+    // MARK: - Screen Time Days Logged/Skipped
+
+    private var screenTimeDaysLoggedThisMonth: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        let comps = calendar.dateComponents([.year, .month], from: now)
+        guard let startOfMonth = calendar.date(from: comps) else { return 0 }
+        return screenTimeManager.allScreenTimeData.filter {
+            guard let d = $0.date else { return false }
+            return d >= startOfMonth && $0.minutes >= 0
+        }.count
+    }
+
+    private var screenTimeDaysSkippedThisMonth: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        let comps = calendar.dateComponents([.year, .month], from: now)
+        guard let startOfMonth = calendar.date(from: comps) else { return 0 }
+        return screenTimeManager.allScreenTimeData.filter {
+            guard let d = $0.date else { return false }
+            return d >= startOfMonth && $0.minutes < 0
+        }.count
+    }
+
     // MARK: - Streak Calculations
-
-    private var wakeLookup: [Date: Double] {
-        let calendar = Calendar.current
-        var dict = [Date: Double]()
-        for data in healthDataManager.allWakeData {
-            guard let w = data.wakeTime else { continue }
-            let key = calendar.startOfDay(for: w)
-            let mins = wakeTimeInMinutes(w)
-            if let existing = dict[key] {
-                dict[key] = min(existing, mins)
-            } else {
-                dict[key] = mins
-            }
-        }
-        return dict
-    }
-
-    private var screenLookup: [Date: Int] {
-        let calendar = Calendar.current
-        var dict = [Date: Int]()
-        for record in validScreenTimeRecords {
-            guard let d = record.date else { continue }
-            let key = calendar.startOfDay(for: d)
-            dict[key] = Int(record.minutes)
-        }
-        return dict
-    }
 
     private func metGoalsForDay(_ day: Date, wakeLookup: [Date: Double], screenLookup: [Date: Int]) -> Bool {
         guard let mins = wakeLookup[day], mins <= goalWakeMinutes else { return false }
@@ -237,17 +291,15 @@ struct MetricsView: View {
 
     private var currentStreak: Int {
         let calendar = Calendar.current
-        let wLookup = wakeLookup
-        let sLookup = screenLookup
         var streak = 0
         var day = calendar.startOfDay(for: Date())
 
-        // Start from yesterday — today is still in progress
+        // Start from yesterday -- today is still in progress
         guard let yesterday = calendar.date(byAdding: .day, value: -1, to: day) else { return 0 }
         day = yesterday
 
         while true {
-            if metGoalsForDay(day, wakeLookup: wLookup, screenLookup: sLookup) {
+            if metGoalsForDay(day, wakeLookup: cachedWakeLookup, screenLookup: cachedScreenLookup) {
                 streak += 1
             } else {
                 break
@@ -266,18 +318,16 @@ struct MetricsView: View {
 
     private var bestStreakThisYear: Int {
         let calendar = Calendar.current
-        let now = Date()
+        let now = calendar.startOfDay(for: Date())
         let year = calendar.component(.year, from: now)
         guard let jan1 = calendar.date(from: DateComponents(year: year, month: 1, day: 1)) else { return 0 }
 
-        let wLookup = wakeLookup
-        let sLookup = screenLookup
         var best = 0
         var current = 0
         var day = jan1
 
         while day <= now {
-            if metGoalsForDay(day, wakeLookup: wLookup, screenLookup: sLookup) {
+            if metGoalsForDay(day, wakeLookup: cachedWakeLookup, screenLookup: cachedScreenLookup) {
                 current += 1
                 best = max(best, current)
             } else {
@@ -287,6 +337,13 @@ struct MetricsView: View {
             guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
             day = nextDay
         }
-        return best
+
+        let storedKey = "bestStreak_\(year)"
+        let storedBest = UserDefaults.standard.integer(forKey: storedKey)
+        let finalBest = max(best, storedBest)
+        if finalBest > storedBest {
+            UserDefaults.standard.set(finalBest, forKey: storedKey)
+        }
+        return finalBest
     }
 }

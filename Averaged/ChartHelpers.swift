@@ -35,11 +35,21 @@ func chartYDomain(for values: [Double], goal: Double) -> ClosedRange<Double> {
     let stride = Double(ChartConstants.defaultStride)
     let minVal = allVals.min() ?? 0
     let maxVal = allVals.max() ?? Double(ChartConstants.minutesInDay)
-    let minFloor = Double(Int(minVal / stride) * ChartConstants.defaultStride) - stride
-    let maxCeil = Double(Int(maxVal / stride) * ChartConstants.defaultStride) + stride
+    let minFloor = Double(Int(minVal / stride) * Int(stride)) - stride
+    let maxCeil = Double(Int(maxVal / stride) * Int(stride)) + stride
     let lower = max(0, minFloor)
     let upper = min(Double(ChartConstants.minutesInDay), maxCeil)
     return lower...upper
+}
+
+func loadWakeTimeGoalMinutes() -> Double {
+    let epoch = UserDefaults.standard.double(forKey: "goalWakeTime")
+    if epoch > 0 {
+        let date = Date(timeIntervalSince1970: epoch)
+        let comps = Calendar.current.dateComponents([.hour, .minute], from: date)
+        return Double((comps.hour ?? 6) * 60 + (comps.minute ?? 0))
+    }
+    return 360
 }
 
 func singleLetterMonth(_ date: Date) -> String {

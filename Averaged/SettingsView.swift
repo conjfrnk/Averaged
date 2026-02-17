@@ -16,6 +16,7 @@ struct SettingsView: View {
     @State private var showExportSuccess = false
     @State private var showExportError = false
     @State private var exportErrorMessage = ""
+    @State private var isExporting = false
 
     @State private var selectedWakeTime: Date = {
         let calendar = Calendar.current
@@ -176,11 +177,19 @@ struct SettingsView: View {
                 }
 
                 Button {
+                    isExporting = true
                     generateAndShareCSV()
                 } label: {
-                    Label("Export Data", systemImage: "square.and.arrow.up")
+                    if isExporting {
+                        ProgressView()
+                            .padding(.trailing, 4)
+                        Text("Exporting...")
+                    } else {
+                        Label("Export Data", systemImage: "square.and.arrow.up")
+                    }
                 }
                 .buttonStyle(.bordered)
+                .disabled(isExporting)
 
                 Spacer()
             }
@@ -252,7 +261,14 @@ struct SettingsView: View {
     private func createWakeDragGesture() -> some Gesture {
         DragGesture()
             .onChanged { value in
-                wakeScrollOffset = lastWakeDragValue + value.translation.width
+                let maxOffset: CGFloat = 0
+                let minOffset = -CGFloat(wakeTimeOptions.count - 1) * totalItemWidth
+                let raw = lastWakeDragValue + value.translation.width
+                let clamped = max(minOffset, min(maxOffset, raw))
+                if raw != clamped {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }
+                wakeScrollOffset = clamped
             }
             .onEnded { value in
                 let totalTranslation =
@@ -285,8 +301,14 @@ struct SettingsView: View {
     private func createScreenTimeDragGesture() -> some Gesture {
         DragGesture()
             .onChanged { value in
-                screenTimeScrollOffset =
-                    lastScreenTimeDragValue + value.translation.width
+                let maxOffset: CGFloat = 0
+                let minOffset = -CGFloat(screenTimeOptions.count - 1) * totalItemWidth
+                let raw = lastScreenTimeDragValue + value.translation.width
+                let clamped = max(minOffset, min(maxOffset, raw))
+                if raw != clamped {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }
+                screenTimeScrollOffset = clamped
             }
             .onEnded { value in
                 let totalTranslation =
@@ -454,16 +476,21 @@ struct SettingsView: View {
             csv += "\(dateStr),\(wakeStr),\(screenStr)\n"
         }
 
+        let filenameDateFormatter = DateFormatter()
+        filenameDateFormatter.dateFormat = "yyyy-MM-dd"
+        let dateStamp = filenameDateFormatter.string(from: Date())
         let tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("averaged_export.csv")
+            .appendingPathComponent("averaged_export_\(dateStamp).csv")
         do {
             try csv.write(to: tempURL, atomically: true, encoding: .utf8)
             exportFileURL = tempURL
             showShareSheet = true
             showExportSuccess = true
+            isExporting = false
         } catch {
             exportErrorMessage = "Failed to write CSV: \(error.localizedDescription)"
             showExportError = true
+            isExporting = false
         }
     }
 }

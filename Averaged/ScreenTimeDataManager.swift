@@ -12,6 +12,7 @@ class ScreenTimeDataManager: ObservableObject {
     static let shared = ScreenTimeDataManager()
     let container: NSPersistentContainer
     @Published var allScreenTimeData: [ScreenTimeRecord] = []
+    @Published var dataError: Error?
 
     var validScreenTimeData: [ScreenTimeRecord] {
         allScreenTimeData.filter { $0.minutes >= 0 }
@@ -32,10 +33,13 @@ class ScreenTimeDataManager: ObservableObject {
             ScreenTimeRecord.fetchRequest()
         let sort = NSSortDescriptor(key: "date", ascending: false)
         request.sortDescriptors = [sort]
-        if let results = try? container.viewContext.fetch(request) {
-            allScreenTimeData = results
-        } else {
+        do {
+            allScreenTimeData = try container.viewContext.fetch(request)
+            dataError = nil
+        } catch {
+            print("CoreData: Failed to fetch screen time: \(error)")
             allScreenTimeData = []
+            dataError = error
         }
     }
 

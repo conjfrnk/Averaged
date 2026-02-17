@@ -20,6 +20,7 @@ struct MonthlyView: View {
     @State private var dailyScreenTimes: [DailyScreenTimeData] = []
     @State private var goalWakeMinutes: Double = 360
     @State private var isLoading = false
+    @State private var showAuthError = false
     @AppStorage("screenTimeGoal") private var screenTimeGoal: Int = 120
 
     var body: some View {
@@ -228,6 +229,11 @@ struct MonthlyView: View {
             }
             .padding()
         }
+        .alert("Health Data Access", isPresented: $showAuthError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Unable to access Health data. Please enable access in Settings > Health > Data Access.")
+        }
         .onAppear {
             healthDataManager.requestAuthorization { _, _ in }
             if healthDataManager.allWakeData.isEmpty {
@@ -240,25 +246,17 @@ struct MonthlyView: View {
                 reloadMonthlyData()
             }
             reloadMonthlyScreenTime()
-            loadUserGoal()
+            goalWakeMinutes = loadWakeTimeGoalMinutes()
+            if healthDataManager.authorizationError != nil {
+                showAuthError = true
+            }
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .didChangeGoalTime)
         ) { _ in
-            loadUserGoal()
+            goalWakeMinutes = loadWakeTimeGoalMinutes()
             reloadMonthlyData()
             reloadMonthlyScreenTime()
-        }
-    }
-
-    func loadUserGoal() {
-        let epoch = UserDefaults.standard.double(forKey: "goalWakeTime")
-        if epoch > 0 {
-            let date = Date(timeIntervalSince1970: epoch)
-            let comps = Calendar.current.dateComponents(
-                [.hour, .minute], from: date)
-            goalWakeMinutes = Double(
-                (comps.hour ?? 6) * 60 + (comps.minute ?? 0))
         }
     }
 
@@ -342,7 +340,9 @@ struct MonthlyView: View {
 
     private var wakeTimeChartAccessibilityLabel: String {
         if let avg = computeAverage(dailyWakeTimes.map(\.wakeMinutes)) {
-            return "Wake time chart showing average of \(minutesToHHmm(avg)) this month"
+            let hours = Int(avg) / 60
+            let minutes = Int(avg) % 60
+            return "Wake time chart showing average of \(hours) hours \(minutes) minutes this month"
         }
         return "Wake time chart with no data"
     }

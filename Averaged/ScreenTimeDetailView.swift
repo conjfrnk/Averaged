@@ -17,6 +17,7 @@ struct ScreenTimeDetailView: View {
     @State private var mins: Int = 0
 
     @State private var existingRecordMinutes: Int? = nil
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         NavigationView {
@@ -64,7 +65,7 @@ struct ScreenTimeDetailView: View {
                     }
                 }
 
-                Button("Save") {
+                Button(hours == 0 && mins == 0 ? "Save (0 min)" : "Save") {
                     let totalMinutes = hours * 60 + mins
                     manager.addOrUpdateScreenTime(
                         date: selectedDate, minutes: totalMinutes)
@@ -85,17 +86,27 @@ struct ScreenTimeDetailView: View {
 
                 if existingRecordMinutes != nil {
                     Button("Delete Entry", role: .destructive) {
-                        if let record = manager.fetchRecord(for: selectedDate) {
-                            manager.delete(record)
-                        }
-                        if let next = firstEmptyDayInCurrentYear() {
-                            selectedDate = next
-                            loadRecord(for: next)
-                        } else {
-                            dismiss()
-                        }
+                        showDeleteConfirmation = true
                     }
                     .buttonStyle(.bordered)
+                    .confirmationDialog(
+                        "Are you sure you want to delete this entry?",
+                        isPresented: $showDeleteConfirmation,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Delete", role: .destructive) {
+                            if let record = manager.fetchRecord(for: selectedDate) {
+                                manager.delete(record)
+                            }
+                            if let next = firstEmptyDayInCurrentYear() {
+                                selectedDate = next
+                                loadRecord(for: next)
+                            } else {
+                                dismiss()
+                            }
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    }
                 }
 
                 Spacer()
