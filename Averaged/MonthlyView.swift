@@ -10,7 +10,7 @@ import SwiftUI
 
 struct MonthlyView: View {
     @EnvironmentObject var healthDataManager: HealthDataManager
-    @ObservedObject private var screenTimeManager = ScreenTimeDataManager.shared
+    @ObservedObject private var autoScreenTime = AutoScreenTimeManager.shared
     @State private var selectedMonth: Date = {
         let cal = Calendar.current
         let comps = cal.dateComponents([.year, .month], from: Date())
@@ -148,7 +148,7 @@ struct MonthlyView: View {
                 Text("Screen Time")
                     .font(.headline)
                 if dailyScreenTimes.isEmpty {
-                    Text("No screen time logged for \(monthNameString(selectedMonth)).\nTap Metrics \u{2192} Log Screen Time to add entries.")
+                    Text("No screen time data for \(monthNameString(selectedMonth)).\nScreen time is recorded automatically.")
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .frame(height: 300)
@@ -284,20 +284,18 @@ struct MonthlyView: View {
     }
 
     func reloadMonthlyScreenTime() {
+        let calendar = Calendar.current
         let start = startOfMonth()
         let end = endOfMonth()
-        let records = screenTimeManager.validScreenTimeData.filter { record in
-            guard let d = record.date else { return false }
-            return d >= start && d <= end
+        var screenTimes: [DailyScreenTimeData] = []
+        var day = start
+        while day <= end {
+            if let mins = autoScreenTime.screenTimeMinutes(for: day) {
+                screenTimes.append(DailyScreenTimeData(date: day, minutes: mins))
+            }
+            day = calendar.date(byAdding: .day, value: 1, to: day)!
         }
-        let sorted = records.sorted {
-            ($0.date ?? Date()) < ($1.date ?? Date())
-        }
-        dailyScreenTimes = sorted.map { r in
-            let dateOnly = Calendar.current.startOfDay(for: r.date ?? Date())
-            return DailyScreenTimeData(
-                date: dateOnly, minutes: Double(r.minutes))
-        }
+        dailyScreenTimes = screenTimes
     }
 
     func startOfMonth() -> Date {

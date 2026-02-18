@@ -155,10 +155,12 @@
 				B34A73BD2D1FA032003E8625 /* Sources */,
 				B34A73BE2D1FA032003E8625 /* Frameworks */,
 				B34A73BF2D1FA032003E8625 /* Resources */,
+				B3AA000C2D928004003E8625 /* Embed Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				B3AA000B2D928008003E8625 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				B34A73C32D1FA032003E8625 /* Averaged */,
@@ -493,7 +495,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Averaged/Averaged.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_ASSET_PATHS = "\"Averaged/Preview Content\"";
 				DEVELOPMENT_TEAM = F2B95Q4CT8;
 				ENABLE_PREVIEWS = YES;
@@ -512,7 +514,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.5;
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.conjfrnk.Averaged;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -528,7 +530,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Averaged/Averaged.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_ASSET_PATHS = "\"Averaged/Preview Content\"";
 				DEVELOPMENT_TEAM = F2B95Q4CT8;
 				ENABLE_PREVIEWS = YES;
@@ -547,7 +549,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.5;
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.conjfrnk.Averaged;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -633,7 +635,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ScreenTimeReport/ScreenTimeReport.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = F2B95Q4CT8;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ScreenTimeReport/Info.plist;
@@ -645,7 +647,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5;
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.conjfrnk.Averaged.ScreenTimeReport;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -660,7 +662,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ScreenTimeReport/ScreenTimeReport.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = F2B95Q4CT8;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ScreenTimeReport/Info.plist;
@@ -672,7 +674,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5;
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.conjfrnk.Averaged.ScreenTimeReport;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

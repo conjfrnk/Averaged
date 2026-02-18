@@ -10,9 +10,8 @@ import UIKit
 
 struct MetricsView: View {
     @EnvironmentObject var healthDataManager: HealthDataManager
-    @ObservedObject private var screenTimeManager = ScreenTimeDataManager.shared
+    @ObservedObject private var autoScreenTime = AutoScreenTimeManager.shared
     @AppStorage("screenTimeGoal") private var screenTimeGoal: Int = 120
-    @State private var showScreenTimeDetail = false
     @State private var goalWakeMinutes: Double = 360
     @State private var showAuthError = false
     @State private var cachedWakeLookup: [Date: Double] = [:]
@@ -75,6 +74,26 @@ struct MetricsView: View {
             }
 
             Section("Screen Time") {
+                if !autoScreenTime.isAuthorized {
+                    Button {
+                        Task {
+                            await autoScreenTime.requestAuthorization()
+                        }
+                    } label: {
+                        Label("Grant Screen Time Access", systemImage: "lock.shield")
+                    }
+                }
+                HStack {
+                    Label("Today", systemImage: "iphone")
+                    Spacer()
+                    if let mins = autoScreenTime.todayMinutes {
+                        Text(minutesToHHmm(mins))
+                            .fontWeight(.semibold)
+                    } else {
+                        Text("N/A")
+                            .foregroundColor(.secondary)
+                    }
+                }
                 HStack {
                     Label("This Week", systemImage: "iphone")
                     Spacer()
@@ -103,35 +122,9 @@ struct MetricsView: View {
                             .help("No screen time logged this month")
                     }
                 }
-                HStack {
-                    Label("Days Logged This Month", systemImage: "checkmark.circle")
-                    Spacer()
-                    Text("\(screenTimeDaysLoggedThisMonth)")
-                        .fontWeight(.semibold)
-                }
-                HStack {
-                    Label("Days Skipped This Month", systemImage: "xmark.circle")
-                    Spacer()
-                    Text("\(screenTimeDaysSkippedThisMonth)")
-                        .fontWeight(.semibold)
-                        .foregroundColor(screenTimeDaysSkippedThisMonth > 0 ? .orange : .secondary)
-                }
-                Button {
-                    showScreenTimeDetail.toggle()
-                } label: {
-                    HStack {
-                        Label("Log Screen Time", systemImage: "plus.circle")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.gray)
-                    }
-                }
             }
         }
         .listStyle(InsetGroupedListStyle())
-        .sheet(isPresented: $showScreenTimeDetail) {
-            ScreenTimeDetailView()
-        }
         .alert("Health Data Access", isPresented: $showAuthError) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -159,7 +152,7 @@ struct MetricsView: View {
         .onChange(of: healthDataManager.allWakeData.count) { _ in
             rebuildLookups()
         }
-        .onChange(of: screenTimeManager.allScreenTimeData.count) { _ in
+        .onChange(of: autoScreenTime.todayMinutes) { _ in
             rebuildLookups()
         }
     }
@@ -180,10 +173,20 @@ struct MetricsView: View {
         cachedWakeLookup = wDict
 
         var sDict = [Date: Int]()
-        for record in validScreenTimeRecords {
-            guard let d = record.date else { continue }
-            let key = calendar.startOfDay(for: d)
-            sDict[key] = Int(record.minutes)
+        let now = Date()
+        let year = calendar.component(.year, from: now)
+        guard let jan1 = calendar.date(from: DateComponents(year: year, month: 1, day: 1)) else {
+            cachedScreenLookup = sDict
+            return
+        }
+        let today = calendar.startOfDay(for: now)
+        var day = jan1
+        while day <= today {
+            if let mins = autoScreenTime.screenTimeMinutes(for: day) {
+                sDict[day] = Int(mins)
+            }
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = nextDay
         }
         cachedScreenLookup = sDict
     }
@@ -228,17 +231,19 @@ struct MetricsView: View {
 
     // MARK: - Screen Time Calculations
 
-    private var validScreenTimeRecords: [ScreenTimeRecord] {
-        screenTimeManager.allScreenTimeData.filter { $0.minutes >= 0 }
-    }
-
     private var weeklyScreenTimeAverage: Double? {
         let calendar = Calendar.current
         let now = Date()
         guard let weekAgo = calendar.date(byAdding: .day, value: -7, to: now) else { return nil }
-        let values = validScreenTimeRecords.compactMap { record -> Double? in
-            guard let d = record.date, d >= weekAgo else { return nil }
-            return Double(record.minutes)
+        var values = [Double]()
+        var day = calendar.startOfDay(for: weekAgo)
+        let today = calendar.startOfDay(for: now)
+        while day <= today {
+            if let mins = autoScreenTime.screenTimeMinutes(for: day) {
+                values.append(mins)
+            }
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = nextDay
         }
         guard !values.isEmpty else { return nil }
         return values.reduce(0, +) / Double(values.count)
@@ -249,36 +254,18 @@ struct MetricsView: View {
         let now = Date()
         let comps = calendar.dateComponents([.year, .month], from: now)
         guard let startOfMonth = calendar.date(from: comps) else { return nil }
-        let values = validScreenTimeRecords.compactMap { record -> Double? in
-            guard let d = record.date, d >= startOfMonth else { return nil }
-            return Double(record.minutes)
+        var values = [Double]()
+        var day = startOfMonth
+        let today = calendar.startOfDay(for: now)
+        while day <= today {
+            if let mins = autoScreenTime.screenTimeMinutes(for: day) {
+                values.append(mins)
+            }
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = nextDay
         }
         guard !values.isEmpty else { return nil }
         return values.reduce(0, +) / Double(values.count)
-    }
-
-    // MARK: - Screen Time Days Logged/Skipped
-
-    private var screenTimeDaysLoggedThisMonth: Int {
-        let calendar = Calendar.current
-        let now = Date()
-        let comps = calendar.dateComponents([.year, .month], from: now)
-        guard let startOfMonth = calendar.date(from: comps) else { return 0 }
-        return screenTimeManager.allScreenTimeData.filter {
-            guard let d = $0.date else { return false }
-            return d >= startOfMonth && $0.minutes >= 0
-        }.count
-    }
-
-    private var screenTimeDaysSkippedThisMonth: Int {
-        let calendar = Calendar.current
-        let now = Date()
-        let comps = calendar.dateComponents([.year, .month], from: now)
-        guard let startOfMonth = calendar.date(from: comps) else { return 0 }
-        return screenTimeManager.allScreenTimeData.filter {
-            guard let d = $0.date else { return false }
-            return d >= startOfMonth && $0.minutes < 0
-        }.count
     }
 
     // MARK: - Streak Calculations

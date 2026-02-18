@@ -9,6 +9,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @EnvironmentObject var healthDataManager: HealthDataManager
+    @ObservedObject private var autoScreenTime = AutoScreenTimeManager.shared
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding =
         false
     @State private var currentPage = 0
@@ -41,7 +42,7 @@ struct OnboardingView: View {
             }
             .tag(0)
 
-            // Page 2
+            // Page 2: Health Access
             VStack(spacing: 24) {
                 Spacer()
                 Image(systemName: "heart.text.square")
@@ -71,7 +72,43 @@ struct OnboardingView: View {
             }
             .tag(1)
 
-            // Page 3
+            // Page 3: Screen Time Access
+            VStack(spacing: 24) {
+                Spacer()
+                Image(systemName: "hourglass")
+                    .font(.system(size: 64))
+                    .foregroundColor(.blue)
+                Text("Screen Time Access")
+                    .font(.title)
+                    .bold()
+                Text(
+                    "Grant Screen Time access to automatically track your daily screen time."
+                )
+                .font(.body)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+                if autoScreenTime.isAuthorized {
+                    Label("Access Granted", systemImage: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.headline)
+                } else {
+                    Button("Grant Screen Time Access") {
+                        Task { await autoScreenTime.requestAuthorization() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                Spacer()
+                Button("Next") {
+                    withAnimation {
+                        currentPage = 3
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .padding(.bottom, 60)
+            }
+            .tag(2)
+
+            // Page 4: Set Your Goals
             VStack(spacing: 24) {
                 Spacer()
                 Image(systemName: "target")
@@ -93,7 +130,7 @@ struct OnboardingView: View {
                 .buttonStyle(.borderedProminent)
                 .padding(.bottom, 60)
             }
-            .tag(2)
+            .tag(3)
         }
         .tabViewStyle(.page(indexDisplayMode: .always))
         .indexViewStyle(.page(backgroundDisplayMode: .always))

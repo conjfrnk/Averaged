@@ -11,6 +11,7 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var healthDataManager: HealthDataManager
+    @ObservedObject private var autoScreenTime = AutoScreenTimeManager.shared
     @State private var exportFileURL: URL?
     @State private var showShareSheet = false
     @State private var showExportSuccess = false
@@ -174,6 +175,30 @@ struct SettingsView: View {
                         }
                     }
                     .frame(height: 100)
+                }
+
+                if autoScreenTime.isAuthorized {
+                    HStack {
+                        Label(
+                            "Screen Time Access",
+                            systemImage: "checkmark.circle.fill"
+                        )
+                        .foregroundColor(.green)
+                        Spacer()
+                        Text("Granted")
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal)
+                } else {
+                    Button {
+                        Task { await autoScreenTime.requestAuthorization() }
+                    } label: {
+                        Label(
+                            "Grant Screen Time Access",
+                            systemImage: "hourglass"
+                        )
+                    }
+                    .buttonStyle(.bordered)
                 }
 
                 Button {
@@ -439,18 +464,21 @@ struct SettingsView: View {
         var csv = "date,wake_time,screen_time_minutes\n"
 
         let wakeData = healthDataManager.allWakeData
-        let screenData = ScreenTimeDataManager.shared.validScreenTimeData
 
-        let screenByDate: [String: Int] = {
-            var dict: [String: Int] = [:]
-            for record in screenData {
-                if let date = record.date {
+        // Build screen time dict from AutoScreenTimeManager
+        let calendar = Calendar.current
+        var screenByDate: [String: Int] = [:]
+        // Scan the last 365 days for screen time data
+        for dayOffset in 0..<365 {
+            if let date = calendar.date(
+                byAdding: .day, value: -dayOffset, to: Date())
+            {
+                if let minutes = autoScreenTime.screenTimeMinutes(for: date) {
                     let key = dateFormatter.string(from: date)
-                    dict[key] = Int(record.minutes)
+                    screenByDate[key] = Int(minutes)
                 }
             }
-            return dict
-        }()
+        }
 
         var allDates = Set<String>()
         for w in wakeData {

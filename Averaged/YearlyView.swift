@@ -10,7 +10,7 @@ import SwiftUI
 
 struct YearlyView: View {
     @EnvironmentObject var healthDataManager: HealthDataManager
-    @ObservedObject private var screenTimeManager = ScreenTimeDataManager.shared
+    @ObservedObject private var autoScreenTime = AutoScreenTimeManager.shared
     @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
     @State private var monthlyWakeTimes: [MonthlyWakeData] = []
     @State private var monthlyScreenTimes: [MonthlyScreenTimeData] = []
@@ -137,7 +137,7 @@ struct YearlyView: View {
                 Text("Screen Time")
                     .font(.headline)
                 if monthlyScreenTimes.isEmpty {
-                    Text("No screen time logged for \(String(selectedYear)).\nTap Metrics \u{2192} Log Screen Time to add entries.")
+                    Text("No screen time data for \(String(selectedYear)).\nScreen time is recorded automatically.")
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .frame(height: 200)
@@ -315,18 +315,17 @@ struct YearlyView: View {
             monthlyScreenTimes = []
             return
         }
-        let filtered = screenTimeManager.validScreenTimeData.filter {
-            guard let d = $0.date else { return false }
-            return d >= jan1 && d < jan1n
-        }
+        // Iterate day-by-day over the year and collect screen time data
         var grouped: [Date: [Double]] = [:]
-        for r in filtered {
-            guard let dateVal = r.date else { continue }
-            let comps = calendar.dateComponents([.year, .month], from: dateVal)
-            guard let startOfMonth = calendar.date(from: comps) else {
-                continue
+        var day = jan1
+        while day < jan1n {
+            if let mins = autoScreenTime.screenTimeMinutes(for: day) {
+                let comps = calendar.dateComponents([.year, .month], from: day)
+                if let startOfMonth = calendar.date(from: comps) {
+                    grouped[startOfMonth, default: []].append(mins)
+                }
             }
-            grouped[startOfMonth, default: []].append(Double(r.minutes))
+            day = calendar.date(byAdding: .day, value: 1, to: day)!
         }
         var temp: [MonthlyScreenTimeData] = []
         for month in 1...12 {
