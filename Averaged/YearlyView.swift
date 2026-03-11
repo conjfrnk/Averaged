@@ -253,17 +253,12 @@ struct YearlyView: View {
         }
         let daysSinceJan1 = max(
             365,
-            Int(Date().timeIntervalSince(jan1) / 86400) + 1)
-        if healthDataManager.allWakeData.isEmpty {
-            isLoading = true
-            healthDataManager.fetchWakeTimesOverLastNDays(daysSinceJan1) {
-                self.processMonthlyWakeData(
-                    calendar: calendar, year: year, jan1: jan1, jan1n: jan1n)
-                self.isLoading = false
-            }
-        } else {
-            processMonthlyWakeData(
+            Int(Date().timeIntervalSince(jan1) / ChartConstants.secondsInDay) + 1)
+        isLoading = true
+        healthDataManager.fetchWakeTimesOverLastNDays(daysSinceJan1) {
+            self.processMonthlyWakeData(
                 calendar: calendar, year: year, jan1: jan1, jan1n: jan1n)
+            self.isLoading = false
         }
     }
 
@@ -325,7 +320,8 @@ struct YearlyView: View {
                     grouped[startOfMonth, default: []].append(mins)
                 }
             }
-            day = calendar.date(byAdding: .day, value: 1, to: day)!
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = nextDay
         }
         var temp: [MonthlyScreenTimeData] = []
         for month in 1...12 {
@@ -347,10 +343,13 @@ struct YearlyView: View {
 
     func currentYearDomain() -> ClosedRange<Date> {
         let calendar = Calendar.current
-        let jan1 = calendar.date(
-            from: DateComponents(year: selectedYear, month: 1, day: 1))!
-        let dec31 = calendar.date(
-            from: DateComponents(year: selectedYear, month: 12, day: 31))!
+        guard let jan1 = calendar.date(
+            from: DateComponents(year: selectedYear, month: 1, day: 1)),
+              let dec31 = calendar.date(
+            from: DateComponents(year: selectedYear, month: 12, day: 31))
+        else {
+            return Date()...Date()
+        }
         return jan1...dec31
     }
 

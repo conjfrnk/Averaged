@@ -6,11 +6,13 @@
 //
 
 import Foundation
+import os.log
 import UserNotifications
 import SwiftUI
 
 class NotificationManager: ObservableObject {
     static let shared = NotificationManager()
+    private static let logger = Logger(subsystem: "com.conjfrnk.Averaged", category: "Notifications")
 
     @AppStorage("screenTimeReminderEnabled") var reminderEnabled: Bool = false
     @AppStorage("screenTimeReminderHour") var reminderHour: Int = 20  // 8 PM
@@ -20,8 +22,7 @@ class NotificationManager: ObservableObject {
             options: [.alert, .sound]
         ) { granted, error in
             if let error = error {
-                print(
-                    "Notifications: Failed to request permission: \(error)")
+                Self.logger.error("Failed to request notification permission: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -34,8 +35,8 @@ class NotificationManager: ObservableObject {
         guard reminderEnabled else { return }
 
         let content = UNMutableNotificationContent()
-        content.title = "Log Screen Time"
-        content.body = "Don't forget to log today's screen time!"
+        content.title = "Check Your Progress"
+        content.body = "See how your wake time and screen time are tracking today!"
         content.sound = .default
 
         var dateComponents = DateComponents()
@@ -48,7 +49,11 @@ class NotificationManager: ObservableObject {
             identifier: "screenTimeReminder", content: content,
             trigger: trigger)
 
-        UNUserNotificationCenter.current().add(request)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                Self.logger.error("Failed to schedule reminder: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     func cancelReminder() {

@@ -33,11 +33,11 @@ class AutoScreenTimeManager: ObservableObject {
     }
 
     private func startPeriodicRefresh() {
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            DispatchQueue.main.async {
-                self?.loadTodayData()
-            }
+        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
+            self?.loadTodayData()
         }
+        RunLoop.main.add(timer, forMode: .common)
+        refreshTimer = timer
     }
 
     private func observeForeground() {
@@ -69,15 +69,21 @@ class AutoScreenTimeManager: ObservableObject {
             AuthorizationCenter.shared.authorizationStatus == .approved
     }
 
+    /// Generates a timezone-stable key for a given day using date components (YYYY-MM-DD).
+    static func screenTimeKey(for date: Date) -> String {
+        let calendar = Calendar.current
+        let comps = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "screenTime_%04d-%02d-%02d", comps.year!, comps.month!, comps.day!)
+    }
+
     func loadTodayData() {
-        guard
-            let defaults = UserDefaults(suiteName: appGroupID)
-        else { return }
-        let today = Calendar.current.startOfDay(for: Date())
-        let key = "screenTime_\(today.timeIntervalSince1970)"
-        let minutes = defaults.double(forKey: key)
-        if minutes > 0 {
+        guard let defaults = UserDefaults(suiteName: appGroupID) else { return }
+        let key = Self.screenTimeKey(for: Date())
+        if defaults.object(forKey: key) != nil {
+            let minutes = defaults.double(forKey: key)
             todayMinutes = minutes
+        } else {
+            todayMinutes = nil
         }
     }
 
@@ -85,9 +91,20 @@ class AutoScreenTimeManager: ObservableObject {
         guard let defaults = UserDefaults(suiteName: appGroupID) else {
             return nil
         }
+        let key = Self.screenTimeKey(for: date)
+        if defaults.object(forKey: key) != nil {
+            return defaults.double(forKey: key)
+        }
+        // Backward compat: try old epoch-based keys
         let dayStart = Calendar.current.startOfDay(for: date)
-        let key = "screenTime_\(dayStart.timeIntervalSince1970)"
-        let minutes = defaults.double(forKey: key)
-        return minutes > 0 ? minutes : nil
+        let intKey = "screenTime_\(Int(dayStart.timeIntervalSince1970))"
+        if defaults.object(forKey: intKey) != nil {
+            return defaults.double(forKey: intKey)
+        }
+        let doubleKey = "screenTime_\(dayStart.timeIntervalSince1970)"
+        if defaults.object(forKey: doubleKey) != nil {
+            return defaults.double(forKey: doubleKey)
+        }
+        return nil
     }
 }

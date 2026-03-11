@@ -16,6 +16,7 @@ struct MetricsView: View {
     @State private var showAuthError = false
     @State private var cachedWakeLookup: [Date: Double] = [:]
     @State private var cachedScreenLookup: [Date: Int] = [:]
+    @State private var lastNotifiedStreakMilestone: Int = 0
 
     var body: some View {
         List {
@@ -132,16 +133,17 @@ struct MetricsView: View {
         }
         .onAppear {
             goalWakeMinutes = loadWakeTimeGoalMinutes()
-            if healthDataManager.allWakeData.isEmpty {
-                healthDataManager.requestAuthorization { _, _ in }
-                healthDataManager.fetchWakeTimesOverLastNDays(365) {
+            healthDataManager.requestAuthorization { success, _ in
+                if healthDataManager.allWakeData.isEmpty {
+                    healthDataManager.fetchWakeTimesOverLastNDays(365) {
+                        rebuildLookups()
+                    }
+                } else {
                     rebuildLookups()
                 }
-            } else {
-                rebuildLookups()
-            }
-            if healthDataManager.authorizationError != nil {
-                showAuthError = true
+                if healthDataManager.authorizationError != nil {
+                    showAuthError = true
+                }
             }
         }
         .onReceive(
@@ -149,10 +151,10 @@ struct MetricsView: View {
         ) { _ in
             goalWakeMinutes = loadWakeTimeGoalMinutes()
         }
-        .onChange(of: healthDataManager.allWakeData.count) { _ in
+        .onChange(of: healthDataManager.allWakeData.count) {
             rebuildLookups()
         }
-        .onChange(of: autoScreenTime.todayMinutes) { _ in
+        .onChange(of: autoScreenTime.todayMinutes) {
             rebuildLookups()
         }
     }
@@ -189,6 +191,65 @@ struct MetricsView: View {
             day = nextDay
         }
         cachedScreenLookup = sDict
+
+        // Fire haptic for streak milestones (side effect belongs here, not in computed property)
+        let streak = computeCurrentStreak(wakeLookup: wDict, screenLookup: sDict)
+        let milestones = [7, 30, 100]
+        if let milestone = milestones.first(where: { $0 == streak }),
+           milestone != lastNotifiedStreakMilestone {
+            lastNotifiedStreakMilestone = milestone
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+
+        // Persist best streak to UserDefaults (side effect, not safe in computed property)
+        persistBestStreak(wakeLookup: wDict, screenLookup: sDict)
+    }
+
+    /// Persists the best streak for the current year to UserDefaults.
+    private func persistBestStreak(wakeLookup: [Date: Double], screenLookup: [Date: Int]) {
+        let calendar = Calendar.current
+        let now = calendar.startOfDay(for: Date())
+        let year = calendar.component(.year, from: now)
+        guard let jan1 = calendar.date(from: DateComponents(year: year, month: 1, day: 1)) else { return }
+
+        var best = 0
+        var current = 0
+        var day = jan1
+        while day <= now {
+            if metGoalsForDay(day, wakeLookup: wakeLookup, screenLookup: screenLookup) {
+                current += 1
+                best = max(best, current)
+            } else {
+                current = 0
+            }
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = nextDay
+        }
+
+        let storedKey = "bestStreak_\(year)"
+        let storedBest = UserDefaults.standard.integer(forKey: storedKey)
+        if best > storedBest {
+            UserDefaults.standard.set(best, forKey: storedKey)
+        }
+    }
+
+    /// Computes the current streak using provided lookups (avoids accessing @State in computed property)
+    private func computeCurrentStreak(wakeLookup: [Date: Double], screenLookup: [Date: Int]) -> Int {
+        let calendar = Calendar.current
+        var streak = 0
+        var day = calendar.startOfDay(for: Date())
+        guard let yesterday = calendar.date(byAdding: .day, value: -1, to: day) else { return 0 }
+        day = yesterday
+        while true {
+            if metGoalsForDay(day, wakeLookup: wakeLookup, screenLookup: screenLookup) {
+                streak += 1
+            } else {
+                break
+            }
+            guard let prevDay = calendar.date(byAdding: .day, value: -1, to: day) else { break }
+            day = prevDay
+        }
+        return streak
     }
 
     // MARK: - Wake Time Calculations
@@ -235,15 +296,10 @@ struct MetricsView: View {
         let calendar = Calendar.current
         let now = Date()
         guard let weekAgo = calendar.date(byAdding: .day, value: -7, to: now) else { return nil }
-        var values = [Double]()
-        var day = calendar.startOfDay(for: weekAgo)
-        let today = calendar.startOfDay(for: now)
-        while day <= today {
-            if let mins = autoScreenTime.screenTimeMinutes(for: day) {
-                values.append(mins)
-            }
-            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
-            day = nextDay
+        let weekAgoStart = calendar.startOfDay(for: weekAgo)
+        let values = cachedScreenLookup.compactMap { (day, mins) -> Double? in
+            guard day >= weekAgoStart else { return nil }
+            return Double(mins)
         }
         guard !values.isEmpty else { return nil }
         return values.reduce(0, +) / Double(values.count)
@@ -254,15 +310,9 @@ struct MetricsView: View {
         let now = Date()
         let comps = calendar.dateComponents([.year, .month], from: now)
         guard let startOfMonth = calendar.date(from: comps) else { return nil }
-        var values = [Double]()
-        var day = startOfMonth
-        let today = calendar.startOfDay(for: now)
-        while day <= today {
-            if let mins = autoScreenTime.screenTimeMinutes(for: day) {
-                values.append(mins)
-            }
-            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
-            day = nextDay
+        let values = cachedScreenLookup.compactMap { (day, mins) -> Double? in
+            guard day >= startOfMonth else { return nil }
+            return Double(mins)
         }
         guard !values.isEmpty else { return nil }
         return values.reduce(0, +) / Double(values.count)
@@ -295,11 +345,6 @@ struct MetricsView: View {
             day = prevDay
         }
 
-        if [7, 30, 100].contains(streak) {
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.success)
-        }
-
         return streak
     }
 
@@ -327,10 +372,6 @@ struct MetricsView: View {
 
         let storedKey = "bestStreak_\(year)"
         let storedBest = UserDefaults.standard.integer(forKey: storedKey)
-        let finalBest = max(best, storedBest)
-        if finalBest > storedBest {
-            UserDefaults.standard.set(finalBest, forKey: storedKey)
-        }
-        return finalBest
+        return max(best, storedBest)
     }
 }

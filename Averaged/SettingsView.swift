@@ -90,19 +90,19 @@ struct SettingsView: View {
                                     .scaleEffect(
                                         scaleEffectForItem(
                                             i, offset: wakeScrollOffset,
-                                            centerX: center)
+                                            centerX: center, containerWidth: geometry.size.width)
                                     )
                                     .rotation3DEffect(
                                         rotationAngleForItem(
                                             i, offset: wakeScrollOffset,
-                                            centerX: center),
+                                            centerX: center, containerWidth: geometry.size.width),
                                         axis: (x: 0, y: 1, z: 0),
                                         anchor: .center, perspective: 0.5
                                     )
                                     .opacity(
                                         opacityForItem(
                                             i, offset: wakeScrollOffset,
-                                            centerX: center)
+                                            centerX: center, containerWidth: geometry.size.width)
                                     )
                                     .onTapGesture {
                                         selectWakeTime(i)
@@ -147,19 +147,19 @@ struct SettingsView: View {
                                     .scaleEffect(
                                         scaleEffectForItem(
                                             idx, offset: screenTimeScrollOffset,
-                                            centerX: center)
+                                            centerX: center, containerWidth: geometry.size.width)
                                     )
                                     .rotation3DEffect(
                                         rotationAngleForItem(
                                             idx, offset: screenTimeScrollOffset,
-                                            centerX: center),
+                                            centerX: center, containerWidth: geometry.size.width),
                                         axis: (x: 0, y: 1, z: 0),
                                         anchor: .center, perspective: 0.5
                                     )
                                     .opacity(
                                         opacityForItem(
                                             idx, offset: screenTimeScrollOffset,
-                                            centerX: center)
+                                            centerX: center, containerWidth: geometry.size.width)
                                     )
                                     .onTapGesture {
                                         selectScreenTimeGoal(idx)
@@ -219,7 +219,7 @@ struct SettingsView: View {
                 Spacer()
             }
             .padding()
-            .sheet(isPresented: $showShareSheet) {
+            .sheet(isPresented: $showShareSheet, onDismiss: cleanUpExportFile) {
                 if let url = exportFileURL {
                     ShareSheet(activityItems: [url])
                 }
@@ -423,36 +423,42 @@ struct SettingsView: View {
     }
 
     private func scaleEffectForItem(
-        _ index: Int, offset: CGFloat, centerX: CGFloat
+        _ index: Int, offset: CGFloat, centerX: CGFloat, containerWidth: CGFloat
     ) -> CGFloat {
         let itemPosition =
             CGFloat(index) * totalItemWidth + offset
-            + ((UIScreen.main.bounds.width - itemWidth) / 2) + (itemWidth / 2)
+            + ((containerWidth - itemWidth) / 2) + (itemWidth / 2)
         let distance = abs(itemPosition - centerX)
-        let maxDistance = UIScreen.main.bounds.width / 2
+        let maxDistance = containerWidth / 2
         return max(0.7, 1 - (distance / maxDistance) * 0.3)
     }
 
     private func rotationAngleForItem(
-        _ index: Int, offset: CGFloat, centerX: CGFloat
+        _ index: Int, offset: CGFloat, centerX: CGFloat, containerWidth: CGFloat
     ) -> Angle {
         let itemPosition =
             CGFloat(index) * totalItemWidth + offset
-            + ((UIScreen.main.bounds.width - itemWidth) / 2) + (itemWidth / 2)
+            + ((containerWidth - itemWidth) / 2) + (itemWidth / 2)
         let angle =
-            Double((itemPosition - centerX) / UIScreen.main.bounds.width) * 30
+            Double((itemPosition - centerX) / containerWidth) * 30
         return Angle(degrees: angle)
     }
 
-    private func opacityForItem(_ index: Int, offset: CGFloat, centerX: CGFloat)
-        -> Double
-    {
+    private func opacityForItem(
+        _ index: Int, offset: CGFloat, centerX: CGFloat, containerWidth: CGFloat
+    ) -> Double {
         let itemPosition =
             CGFloat(index) * totalItemWidth + offset
-            + ((UIScreen.main.bounds.width - itemWidth) / 2) + (itemWidth / 2)
+            + ((containerWidth - itemWidth) / 2) + (itemWidth / 2)
         let distance = abs(itemPosition - centerX)
-        let maxDistance = UIScreen.main.bounds.width / 2
+        let maxDistance = containerWidth / 2
         return Double(max(0.5, 1 - (distance / maxDistance)))
+    }
+
+    private func cleanUpExportFile() {
+        guard let url = exportFileURL else { return }
+        try? FileManager.default.removeItem(at: url)
+        exportFileURL = nil
     }
 
     private func generateAndShareCSV() {

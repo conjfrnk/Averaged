@@ -11,6 +11,7 @@ import Foundation
 
 enum ChartConstants {
     static let minutesInDay = 1440
+    static let secondsInDay: TimeInterval = 86400
     static let defaultStride = 30
     static let wakeTimeStride = 30
     static let screenTimeStride = 60

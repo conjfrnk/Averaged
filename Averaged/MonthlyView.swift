@@ -30,8 +30,19 @@ struct MonthlyView: View {
                     Button {
                         if let prev = Calendar.current.date(byAdding: .month, value: -1, to: selectedMonth) {
                             selectedMonth = prev
-                            reloadMonthlyData()
-                            reloadMonthlyScreenTime()
+                            // If selected month is before our earliest data, re-fetch
+                            let daysBack = max(60, Int(Date().timeIntervalSince(prev) / 86400) + 31)
+                            if daysBack > 60 {
+                                isLoading = true
+                                healthDataManager.fetchWakeTimesOverLastNDays(daysBack) {
+                                    reloadMonthlyData()
+                                    reloadMonthlyScreenTime()
+                                    isLoading = false
+                                }
+                            } else {
+                                reloadMonthlyData()
+                                reloadMonthlyScreenTime()
+                            }
                         }
                     } label: {
                         Image(systemName: "chevron.left")
@@ -238,7 +249,9 @@ struct MonthlyView: View {
             healthDataManager.requestAuthorization { _, _ in }
             if healthDataManager.allWakeData.isEmpty {
                 isLoading = true
-                healthDataManager.fetchWakeTimesOverLastNDays(60) {
+                let calendar = Calendar.current
+                let daysNeeded = max(60, Int(Date().timeIntervalSince(selectedMonth) / 86400) + 31)
+                healthDataManager.fetchWakeTimesOverLastNDays(daysNeeded) {
                     reloadMonthlyData()
                     isLoading = false
                 }
@@ -270,10 +283,8 @@ struct MonthlyView: View {
         let sorted = items.sorted {
             ($0.wakeTime ?? .distantPast) < ($1.wakeTime ?? .distantPast)
         }
-        let mapped = sorted.map { data -> DailyWakeData in
-            guard let wt = data.wakeTime else {
-                return DailyWakeData(date: data.date, wakeMinutes: 0)
-            }
+        let mapped = sorted.compactMap { data -> DailyWakeData? in
+            guard let wt = data.wakeTime else { return nil }
             let dayOnly = Calendar.current.startOfDay(for: wt)
             let comps = Calendar.current.dateComponents(
                 [.hour, .minute], from: wt)
@@ -293,7 +304,8 @@ struct MonthlyView: View {
             if let mins = autoScreenTime.screenTimeMinutes(for: day) {
                 screenTimes.append(DailyScreenTimeData(date: day, minutes: mins))
             }
-            day = calendar.date(byAdding: .day, value: 1, to: day)!
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = nextDay
         }
         dailyScreenTimes = screenTimes
     }

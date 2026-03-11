@@ -29,17 +29,17 @@ struct TotalActivityReport: DeviceActivityReportScene {
 
         let totalMinutes = totalDuration / 60.0
 
-        // Write to App Group for main app to read
+        // Write to App Group for main app to read.
+        // Key uses YYYY-MM-DD date components for timezone stability.
         if let defaults = UserDefaults(
             suiteName: "group.com.conjfrnk.Averaged")
         {
             let today = Calendar.current.startOfDay(for: Date())
-            let key = "screenTime_\(today.timeIntervalSince1970)"
+            let comps = Calendar.current.dateComponents([.year, .month, .day], from: today)
+            let key = String(format: "screenTime_%04d-%02d-%02d", comps.year!, comps.month!, comps.day!)
             defaults.set(totalMinutes, forKey: key)
-            defaults.set(
-                today.timeIntervalSince1970,
-                forKey: "lastScreenTimeUpdate")
-            defaults.synchronize()
+            let updateKey = String(format: "lastScreenTimeUpdate_%04d-%02d-%02d", comps.year!, comps.month!, comps.day!)
+            defaults.set(Date().timeIntervalSince1970, forKey: updateKey)
         }
 
         return totalMinutes

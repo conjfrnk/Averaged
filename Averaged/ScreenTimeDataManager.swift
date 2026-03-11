@@ -6,11 +6,13 @@
 //
 
 import CoreData
+import os.log
 import SwiftUI
 
 class ScreenTimeDataManager: ObservableObject {
     static let shared = ScreenTimeDataManager()
-    let container: NSPersistentContainer
+    private static let logger = Logger(subsystem: "com.conjfrnk.Averaged", category: "CoreData")
+    private let container: NSPersistentContainer
     @Published var allScreenTimeData: [ScreenTimeRecord] = []
     @Published var dataError: Error?
 
@@ -20,12 +22,18 @@ class ScreenTimeDataManager: ObservableObject {
 
     private init() {
         container = NSPersistentContainer(name: "ScreenTimeModel")
-        container.loadPersistentStores { _, error in
+        container.loadPersistentStores { [weak self] _, error in
             if let error = error {
-                print("CoreData: Failed to load persistent stores: \(error)")
+                Self.logger.error("Failed to load persistent stores: \(error.localizedDescription, privacy: .public)")
+                DispatchQueue.main.async {
+                    self?.dataError = error
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self?.fetchAllScreenTime()
+                }
             }
         }
-        fetchAllScreenTime()
     }
 
     func fetchAllScreenTime() {
@@ -37,7 +45,7 @@ class ScreenTimeDataManager: ObservableObject {
             allScreenTimeData = try container.viewContext.fetch(request)
             dataError = nil
         } catch {
-            print("CoreData: Failed to fetch screen time: \(error)")
+            Self.logger.error("Failed to fetch screen time: \(error.localizedDescription, privacy: .public)")
             allScreenTimeData = []
             dataError = error
         }
@@ -65,13 +73,17 @@ class ScreenTimeDataManager: ObservableObject {
         let request: NSFetchRequest<ScreenTimeRecord> =
             ScreenTimeRecord.fetchRequest()
         let dayStart = Calendar.current.startOfDay(for: date)
-        let dayEnd = Calendar.current.date(
-            byAdding: .day, value: 1, to: dayStart)!
+        guard let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: dayStart) else { return nil }
         request.predicate = NSPredicate(
             format: "date >= %@ AND date < %@", dayStart as NSDate,
             dayEnd as NSDate)
         request.fetchLimit = 1
-        return (try? container.viewContext.fetch(request))?.first
+        do {
+            return try container.viewContext.fetch(request).first
+        } catch {
+            Self.logger.error("Failed to fetch record for \(date): \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
     }
 
     func isSkippedDay(_ date: Date) -> Bool {
@@ -90,7 +102,7 @@ class ScreenTimeDataManager: ObservableObject {
         do {
             try container.viewContext.save()
         } catch {
-            print("CoreData: Failed to save context: \(error)")
+            Self.logger.error("Failed to save context: \(error.localizedDescription, privacy: .public)")
         }
         fetchAllScreenTime()
     }
