@@ -5,7 +5,9 @@
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionPointIdentifier</key>
-		<string>com.apple.deviceactivity.report</string>
+		<string>com.apple.deviceactivityui.report-extension</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>$(PRODUCT_MODULE_NAME).ScreenTimeReportExtension</string>
 	</dict>
 </dict>
 </plist>
